@@ -1,0 +1,40 @@
+<registry>
+  <components>
+    <component type="flash-media-server-producer"
+               base="flumotion/component/producers/fms">
+      <source location="flumotion.component.producers.fms.fms"/>
+      <feeder name="default"/>
+
+      <entries>
+        <entry type="component" location="fms.py"
+               function="FlashMediaServer"/>
+      </entries>
+
+      <properties>
+        <property name="port" type="int"
+                  description="Port to listen on (default: 1935)" />
+        <property name="mount-point" type="string"
+                  description="The mount point the stream is to be produced on. It must be absolute and have at least two parts. (default: /live/stream.flv)" />
+      </properties>
+    </component>
+  </components>
+
+  <bundles>
+
+    <bundle project="flashmedia" name="flash-media-server-producer-component">
+        <dependencies>
+            <dependency name="component" />
+        </dependencies>
+
+        <directories>
+            <directory name="flumotion/component/producers/fms">
+                <filename location="__init__.py" />
+                <filename location="fms.py" />
+                <filename location="live.py" />
+            </directory>
+        </directories>
+    </bundle>
+
+  </bundles>
+
+</registry>

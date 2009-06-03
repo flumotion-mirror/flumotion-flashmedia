@@ -1,0 +1,50 @@
+Name:           @PACKAGE@
+Version:        @VERSION@
+Release:        @RELEASE@
+Summary:        Flumotion Flash Media Streaming support.
+
+Group:          Applications/Internet
+License:	Proprietary
+URL:            http://www.fluendo.com/
+Source:         %{name}-%{version}.tar.bz2
+BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
+
+Requires:	flumotion >= @FLU_REQ@
+
+BuildRequires:	gettext
+BuildRequires:	python >= 2.3
+BuildRequires:	python-twisted
+BuildRequires:	flumotion >= @FLU_REQ@
+BuildRequires:	epydoc
+BuildRequires:  pkgconfig
+
+%description
+Flumotion Flash Media Streaming support.
+
+%prep
+%setup -q
+
+%build
+%configure
+
+make
+
+%install
+rm -rf $RPM_BUILD_ROOT
+
+%makeinstall
+
+# %find_lang flumotion-flashmedia
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+# %files -f flumotion-flashmedia.lang
+%files
+%defattr(-,root,root,-)
+%doc ChangeLog COPYING README AUTHORS
+%{_libdir}/flumotion
+
+%changelog
+* Mon Feb  9 2009 Arek Korbik <arek@flumotion.com>
+- init
