@@ -6,8 +6,6 @@ applications.
 
 import sys, os.path
 
-sys.path.insert(0, os.getcwd())
-
 import re
 import pyamf.util
 from twisted.internet import defer, reactor
@@ -225,7 +223,7 @@ class Client(server.Client):
     connects to an application; the object is destroyed when the user
     disconnects from the application.
 
-    @note: The functions in this class are just copies from live/main.asc - 
+    @note: The functions in this class are just copies from live/main.asc -
         they don't do anything important (it seems).
     """
 
