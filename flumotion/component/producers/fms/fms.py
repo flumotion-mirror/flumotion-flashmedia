@@ -87,6 +87,10 @@ class FMSApplication(server.Application, log.Loggable):
 
         if stream.name != self._streamName:
             self.debug("Stream %s refused", stream.name)
+            # RTMPy do not refuse the stream properly making FME
+            # stream it anyway without error message and RTMPy just discard the data.
+            # Force disconnection to have some user feedback when the stream is refused.
+            client.disconnect()
             return False
 
         self._client = client
@@ -469,13 +473,13 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
 
     def do_setup(self):
         app = FMSApplication(self, self._streamName)
-        server = live.Server({self._appName: app})
+        factory = server.ServerFactory({self._appName: app})
 
         self._scheduleMonitoring()
 
         try:
             self.debug('Listening on %d' % self._port)
-            reactor.listenTCP(self._port, server)
+            reactor.listenTCP(self._port, factory)
         except error.CannotListenError:
             t = 'Port %d is not available.' % self._port
             self.warning(t)

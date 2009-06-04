@@ -1,6 +1,14 @@
 2009-06-04  Sebastien Merle  <sebastien@fluendo.com>
 
 	* flumotion/component/producers/fms/fms.py:
+	RTMPy seems to not report refused publish error to FME,
+	so the encoder don't gives feedback and seems to stream
+	normally even if the data is discarded by RTMPy.
+	Force disconnection when refusing to publish a stream.
+
+2009-06-04  Sebastien Merle  <sebastien@fluendo.com>
+
+	* flumotion/component/producers/fms/fms.py:
 	Now properly set gstreamer DELTA_UNIT flag for audio buffer.
 	This was preventing burst-to-keyframe to work properly.
 
