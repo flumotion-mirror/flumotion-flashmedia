@@ -211,6 +211,7 @@ class FMSApplication(server.Application, log.Loggable):
                 return
 
         buffer = self._buildDataBuffer(fixedTime, flvTag)
+        buffer.flag_set(gst.BUFFER_FLAG_DELTA_UNIT)
 
         self._pushStreamBuffer(buffer)
 

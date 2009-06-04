@@ -1,6 +1,12 @@
 2009-06-04  Sebastien Merle  <sebastien@fluendo.com>
 
 	* flumotion/component/producers/fms/fms.py:
+	Now properly set gstreamer DELTA_UNIT flag for audio buffer.
+	This was preventing burst-to-keyframe to work properly.
+
+2009-06-04  Sebastien Merle  <sebastien@fluendo.com>
+
+	* flumotion/component/producers/fms/fms.py:
 	Fixed to match the API modifications after commiting changes to flvlib.
 	Need flvlib 0.1.5.
 
