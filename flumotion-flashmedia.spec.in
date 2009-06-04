@@ -17,7 +17,6 @@ Requires:	python-pyamf
 
 BuildRequires:	gettext
 BuildRequires:	python >= 2.3
-BuildRequires:	python-twisted
 BuildRequires:	flumotion >= @FLU_REQ@
 BuildRequires:	epydoc
 BuildRequires:  pkgconfig
