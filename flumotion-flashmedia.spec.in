@@ -4,12 +4,13 @@ Release:        @RELEASE@
 Summary:        Flumotion Flash Media Streaming support.
 
 Group:          Applications/Internet
-License:	Proprietary
+License:        Proprietary
 URL:            http://www.fluendo.com/
 Source:         %{name}-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
 
 Requires:	flumotion >= @FLU_REQ@
+Requires:	flvlib >= 0.1.5
 
 BuildRequires:	gettext
 BuildRequires:	python >= 2.3
@@ -46,5 +47,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/flumotion
 
 %changelog
+* Thu Jun 4 2009 Sebastien Merle <sebastien@flumotion.com>
+- Added requirment for flvlib 0.1.5
+
 * Mon Feb  9 2009 Arek Korbik <arek@flumotion.com>
 - init
