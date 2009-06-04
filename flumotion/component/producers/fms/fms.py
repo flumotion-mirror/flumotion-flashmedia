@@ -169,7 +169,11 @@ class FMSApplication(server.Application, log.Loggable):
             return
 
         tag = tags.AudioTag(None, StringIO(data))
-        tag.parse_payload()
+        # flvlib AudioTag parse_tag_content() seek to the end of the tag
+        # and for this need the tag size normally set when calling parse().
+        # Set it to a dummy value just to prevent TypeError.
+        tag.size = 0
+        tag.parse_tag_content()
 
         info = {'format': tag.sound_format,
                 'rate': tag.sound_rate,
@@ -194,7 +198,7 @@ class FMSApplication(server.Application, log.Loggable):
         fixedTime = self._fixeTimestamp(time)
         flvTag = tags.create_flv_tag(TAG_TYPE_AUDIO, data, fixedTime)
 
-        if tag.sequence_header:
+        if tag.aac_packet_type == AAC_PACKET_TYPE_SEQUENCE_HEADER:
             assert self._needAudioHeader, "Audio header not expected"
             if self._gotAudioHeader:
                 self.debug("Dropping audio sequence header")
@@ -222,7 +226,11 @@ class FMSApplication(server.Application, log.Loggable):
             return
 
         tag = tags.VideoTag(None, StringIO(data))
-        tag.parse_payload()
+        # flvlib VideoTag parse_tag_content() seek to the end of the tag
+        # and for this need the tag size normally set when calling parse().
+        # Set it to a dummy value just to prevent TypeError.
+        tag.size = 0
+        tag.parse_tag_content()
 
         info = {'codec': tag.codec_id}
 
@@ -244,7 +252,7 @@ class FMSApplication(server.Application, log.Loggable):
         fixedTime = self._fixeTimestamp(time)
         flvTag = tags.create_flv_tag(TAG_TYPE_VIDEO, data, fixedTime)
 
-        if tag.sequence_header:
+        if tag.h264_packet_type == H264_PACKET_TYPE_SEQUENCE_HEADER:
             assert self._needVideoHeader, "Video header not expected"
             if self._gotVideoHeader:
                 self.debug("Dropping video sequence header")
