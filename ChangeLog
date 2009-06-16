@@ -1,3 +1,8 @@
+2009-06-16  Sebastien Merle  <sebastien@fluendo.com>
+
+	* flumotion/component/producers/fms/fms.py:
+	The bug the last commit worked around is now fixed.
+
 2009-06-04  Sebastien Merle  <sebastien@fluendo.com>
 
 	* flumotion/component/producers/fms/fms.py:

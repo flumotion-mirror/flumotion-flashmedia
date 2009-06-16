@@ -87,11 +87,6 @@ class FMSApplication(server.Application, log.Loggable):
 
         if stream.name != self._streamName:
             self.debug("Stream %s refused", stream.name)
-            # RTMPy do not refuse the stream properly making FME
-            # stream it anyway without error message and RTMPy
-            # just discard the data. So we force disconnection
-            # to have some user feedback when the stream is refused.
-            client.disconnect()
             return False
 
         self._client = client
