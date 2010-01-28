@@ -1,3 +1,11 @@
+2010-01-28  Xavier Queralt Mateu,,,  <xqueralt@flumotion.com>
+
+	* Makefile.am:
+	Add rpm creation rules to the makefile
+	* configure.ac:
+	* flumotion-flashmedia.spec.in:
+	Sync with changes in flumotion at r8195
+
 2009-06-16  Sebastien Merle  <sebastien@fluendo.com>
 
 	* flumotion/component/producers/fms/fms.py:

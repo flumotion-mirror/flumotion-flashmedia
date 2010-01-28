@@ -1,7 +1,11 @@
-AC_INIT(README)
+AC_INIT(flumotion-flashmedia, 0.1.0.1,
+   https://code.area51.fluendo.com/private/trac/newticket?component=flumotion-flashmedia,
+   flumotion-flashmedia)
 
-AS_VERSION(flumotion-flashmedia, FW, 0, 1, 0, 1)
-AC_SUBST(RELEASE, $FW_RELEASE)
+AM_INIT_AUTOMAKE([-Wno-portability])
+
+AS_VERSION
+AS_NANO
 
 AC_SUBST_FILE(AUTHORS)
 AUTHORS=$srcdir/AUTHORS

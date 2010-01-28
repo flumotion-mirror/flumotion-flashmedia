@@ -1,6 +1,6 @@
 Name:           @PACKAGE@
 Version:        @VERSION@
-Release:        @RELEASE@
+Release:        @PACKAGE_VERSION_RELEASE@
 Summary:        Flumotion Flash Media Streaming support.
 
 Group:          Applications/Internet
