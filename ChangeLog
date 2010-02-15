@@ -1,4 +1,9 @@
-2010-01-28  Xavier Queralt Mateu,,,  <xqueralt@flumotion.com>
+2010-02-15  Xavier Queralt Mateu  <xqueralt@flumotion.com>
+
+	* env.in:
+	Add flumotion scripts to the path in env
+
+2010-01-28  Xavier Queralt Mateu  <xqueralt@flumotion.com>
 
 	* Makefile.am:
 	Add rpm creation rules to the makefile
