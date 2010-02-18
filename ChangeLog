@@ -1,3 +1,13 @@
+2010-02-18  Xavier Queralt Mateu  <xqueralt@flumotion.com>
+
+	reviewed by: Sebastien Merle
+
+	* flumotion/component/producers/fms/fms.py:
+	Enable the component to accept reconnections from the encoder:
+	  - When there are network problems
+	  - When the encoder is stopped/restarted
+	  - When the user changes the configuration of the encoded stream
+
 2010-02-15  Xavier Queralt Mateu  <xqueralt@flumotion.com>
 
 	* env.in:

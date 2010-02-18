@@ -55,6 +55,7 @@ class FMSApplication(server.Application, log.Loggable):
 
         self._published = False
         self._started = False
+        self._changed = False
         self._failed = False
 
         self._lastTimestamp = 0
@@ -77,6 +78,16 @@ class FMSApplication(server.Application, log.Loggable):
 
         self._backlog = []
         self._headers = []
+
+    def prePublish(self, client, stream):
+        if stream.publisher:
+            if self._component.starving:
+                stream.publisher.disconnect()
+                stream.removePublisher(self._client)
+                self._component.starving = False
+            else:
+                return False
+        return self.onPublish(client, stream)
 
     def onPublish(self, client, stream):
         self.debug("Client %r publishing stream %s", client, stream.name)
@@ -106,8 +117,6 @@ class FMSApplication(server.Application, log.Loggable):
             return
 
         self._published = True
-        self._lastTimestamp = 0
-        self._tagBuffer = []
 
     def streamUnpublished(self):
         self.debug("Stream %s unpublished", self._streamName)
@@ -119,9 +128,9 @@ class FMSApplication(server.Application, log.Loggable):
 
         self._stream.removeSubscriber(self)
         self._stream = None
+        self._lastTimestamp = 0
 
         self._published = False
-        self._totalTime += self._lastTimestamp
 
     def onMetaData(self, data):
         self.debug("Meta-data: %r", data)
@@ -142,13 +151,12 @@ class FMSApplication(server.Application, log.Loggable):
         if self._creationdate:
             data["creationdate"] = self._creationdate
 
-        if not self._metadata:
+        if self._metadata and self._metadata != data:
+            self.debug("RTMP stream meta-data changed.")
+            self._clear()
+
+        if self._metadata is None:
             self._metadata = data
-        else:
-            if self._metadata != data:
-                self._streamTraitsError("RTMP stream meta-data changed.",
-                                        self._metadata, data)
-                return
 
         if self._started:
             self.debug("Dropping unchanged meta-data tag")
@@ -180,6 +188,10 @@ class FMSApplication(server.Application, log.Loggable):
                 'size': tag.sound_size,
                 'type': tag.sound_type}
 
+        if self._audioinfo and self._audioinfo != info:
+            self.debug("RTMP audio characteristics changed.")
+            self._clear()
+
         if self._audioinfo is None:
             self._audioinfo = info
             nh = sound_format_has_headers.get(tag.sound_format, False)
@@ -187,13 +199,6 @@ class FMSApplication(server.Application, log.Loggable):
                 self.debug("Audio stream need sequence header")
             self._needAudioHeader = nh
             self._gotAudioHeader = False
-        else:
-            if self._audioinfo != info:
-                expected = self._makeAudioInfoHumanReadable(self._audioinfo)
-                got = self._makeAudioInfoHumanReadable(info)
-                self._streamTraitsError("RTMP audio characteristics changed.",
-                                        expected, got)
-                return
 
         fixedTime = self._fixeTimestamp(time)
         flvTag = tags.create_flv_tag(TAG_TYPE_AUDIO, data, fixedTime)
@@ -235,6 +240,10 @@ class FMSApplication(server.Application, log.Loggable):
 
         info = {'codec': tag.codec_id}
 
+        if self._videoinfo and self._videoinfo != info:
+            self.debug("RTMP video characteristics changed. %r", time)
+            self._clear()
+
         if self._videoinfo is None:
             self._videoinfo = info
             nh = codec_id_has_headers.get(tag.codec_id, False)
@@ -242,13 +251,6 @@ class FMSApplication(server.Application, log.Loggable):
                 self.debug("Video stream need sequence header")
             self._needVideoHeader = nh
             self._gotVideoHeader = False
-        else:
-            if self._videoinfo != info:
-                expected = self._makeVideoInfoHumanReadable(self._videoinfo)
-                got = self._makeVideoInfoHumanReadable(info)
-                self._streamTraitsError("RTMP video characteristics changed.",
-                                        expected, got)
-                return
 
         fixedTime = self._fixeTimestamp(time)
         flvTag = tags.create_flv_tag(TAG_TYPE_VIDEO, data, fixedTime)
@@ -311,16 +313,21 @@ class FMSApplication(server.Application, log.Loggable):
         return {'video_codec': codec_id_to_string[info['codec']]}
 
     def _fixeTimestamp(self, timestamp):
-        if timestamp < self._lastTimestamp:
-            self._internalError("Negative timestamp detected %d (last one: %d)"
-                                % (timestamp, self._lastTimestamp))
-            return
+        """Given a timestamp finds out wether it is valid depending on the last
+        timestamp sent. If the timestamp we receive is in the past it is fixed
+        to be contiguous with the previous.
+        """
+        fixedTimestamp = timestamp
 
-        fixedTimestamp = timestamp + self._totalTime
+        if timestamp < self._totalTime:
+            fixedTimestamp = self._totalTime + timestamp - self._lastTimestamp
+            self._lastTimestamp = timestamp
 
         if fixedTimestamp < 0:
             self._internalError("Timestamp cannot be < 0")
             return
+
+        self._totalTime = fixedTimestamp
 
         fixedTimestamp &= 0x7fffffff
 
@@ -329,6 +336,11 @@ class FMSApplication(server.Application, log.Loggable):
     def _addHeader(self, data):
         buffer = self._buildHeaderBuffer(data)
         self._headers.append(buffer)
+        if self._changed:
+            # When changes arrive we want to send the new headers without the
+            # IN_CAPS flag so the buffers are not dropped because of the change
+            # This way the stream is valid and playable for any flash player.
+            self._pushStreamBuffer(self._buildHeaderBuffer(data, False))
 
     def _pushStreamBuffer(self, buffer):
         if self._started:
@@ -403,15 +415,44 @@ class FMSApplication(server.Application, log.Loggable):
 
         for buffer in self._backlog:
             self._component.pushStreamBuffer(buffer)
-        self._backlog = None
+        self._backlog = []
 
         self._started = True
+        self._changed = False
 
-    def _buildHeaderBuffer(self, data):
+    def _clear(self):
+        if not self._started:
+            self.log("Not clearing an stopped stream")
+            return
+
+        self.debug("Stopping streaming")
+
+        self._started = False
+        self._changed = True
+
+        self._metadata = None
+
+        self._audioinfo = None
+        self._videoinfo = None
+
+        self._needAudioHeader = False
+        self._needVideoHeader = False
+
+        self._gotAudioHeader = False
+        self._gotVideoHeader = False
+
+        self._videoEnabled = False
+        self._audioEnabled = False
+        self._lastTimestamp = 0
+
+        self._headers = []
+
+    def _buildHeaderBuffer(self, data, with_in_caps=True):
         buff = gst.Buffer(data)
         buff.timestamp = gst.CLOCK_TIME_NONE
         buff.duration = gst.CLOCK_TIME_NONE
-        buff.flag_set(gst.BUFFER_FLAG_IN_CAPS)
+        if with_in_caps:
+            buff.flag_set(gst.BUFFER_FLAG_IN_CAPS)
         return buff
 
     def _buildDataBuffer(self, timestamp, data):
@@ -437,7 +478,8 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         # For monitorization
         self._bufferCount = 0
         self._monitoringCall = None
-        self._starved = False
+
+        self.starving = False
 
     def get_pipeline_string(self, properties):
         return 'appsrc name=source caps=video/x-flv'
@@ -510,15 +552,15 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
 
     def _doMonitoring(self):
         if self._bufferCount == 0:
-            if not self._starved:
+            if not self.starving:
                 self.debug("No RTMP data received since %0.2f seconds, "
                            "we are starving", self.MONITORING_FREQUENCY)
                 self.setMood(moods.hungry)
-                self._starved = True
+                self.starving = True
         else:
-            if self._starved:
+            if self.starving:
                 self.debug("RTMP data received, we are not starving anymore")
                 self.setMood(moods.happy)
-                self._starved = False
+                self.starving = False
             self._bufferCount = 0
         self._scheduleMonitoring()
