@@ -1,3 +1,10 @@
+2010-02-19  Xavier Queralt Mateu  <xqueralt@flumotion.com>
+
+	reviewed by: jribas
+
+	* flumotion/component/producers/fms/fms.py:
+	Handle better when two or more clients try to publish at the same time.
+
 2010-02-18  Xavier Queralt Mateu  <xqueralt@flumotion.com>
 
 	reviewed by: Sebastien Merle

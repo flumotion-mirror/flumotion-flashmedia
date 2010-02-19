@@ -57,6 +57,7 @@ class FMSApplication(server.Application, log.Loggable):
         self._started = False
         self._changed = False
         self._failed = False
+        self._publishing = False
 
         self._lastTimestamp = 0
         self._totalTime = 0
@@ -81,12 +82,17 @@ class FMSApplication(server.Application, log.Loggable):
 
     def prePublish(self, client, stream):
         if stream.publisher:
-            if self._component.starving:
-                stream.publisher.disconnect()
+            if self._component.starving and not self._publishing:
+                try:
+                    stream.publisher.disconnect()
+                except AttributeError:
+                    self.debug("Publisher already disconnected. Caught "
+                               "exception from Client when trying to "
+                               "disconnect")
                 stream.removePublisher(self._client)
-                self._component.starving = False
             else:
                 return False
+        self._publishing = True
         return self.onPublish(client, stream)
 
     def onPublish(self, client, stream):
@@ -94,15 +100,18 @@ class FMSApplication(server.Application, log.Loggable):
 
         # If we failed we just refuse everything
         if self._failed:
+            self._publishing = False
             return False
 
         if stream.name != self._streamName:
             self.debug("Stream %s refused", stream.name)
+            self._publishing = False
             return False
 
         self._client = client
         self._stream = stream
         stream.addSubscriber(self)
+        self._publishing = False
 
     def onDisconnect(self, client):
         server.Application.onDisconnect(self, client)
