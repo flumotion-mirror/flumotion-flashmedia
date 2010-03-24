@@ -1,3 +1,15 @@
+2010-03-23  Xavier Queralt Mateu  <xqueralt@flumotion.com>
+
+	reviewed by: jribas
+
+	* flumotion/component/producers/fms/fms.py:
+	Fix a bug when the video tag containing the sequence header comes before
+	the new metadata and the codec didn't change. The change was not
+	detected till the metadata came and the sequece header was dropped.
+	Consequently, all the following tags were dropped because there were no
+	sequence header.
+	Fixes #8604
+
 2010-02-19  Xavier Queralt Mateu  <xqueralt@flumotion.com>
 
 	reviewed by: jribas
