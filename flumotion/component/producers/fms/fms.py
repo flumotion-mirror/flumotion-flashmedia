@@ -88,10 +88,10 @@ class FMSApplication(server.Application, log.Loggable):
             if self._component.starving and not self._publishing:
                 try:
                     stream.publisher.disconnect()
-                except AttributeError:
+                except AttributeError, e:
                     self.debug("Publisher already disconnected. Caught "
                                "exception from Client when trying to "
-                               "disconnect")
+                               "disconnect: %s", log.getExceptionMessage(e))
                 stream.removePublisher(self._client)
             else:
                 return False
