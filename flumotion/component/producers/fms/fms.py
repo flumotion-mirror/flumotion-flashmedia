@@ -215,25 +215,29 @@ class FMSApplication(server.Application, log.Loggable):
         fixedTime = self._fixeTimestamp(time)
         flvTag = tags.create_flv_tag(TAG_TYPE_AUDIO, data, fixedTime)
 
-        def addHeader(tag):
-            self.debug("Audio stream sequence header received")
-            self._addHeader(tag)
-            self._gotAudioHeader = True
-            self._tryStarting()
-
         if tag.aac_packet_type == AAC_PACKET_TYPE_SEQUENCE_HEADER:
             assert self._needAudioHeader, "Audio header not expected"
             if self._gotAudioHeader:
+                # FMLE might send the sequence header before the new metadata
+                # which screws us up. We keep the tag instead of dropping it
+                # so we can send it latter when the changes are detected.
                 self._backupAudioHeader = flvTag
                 self.debug("Keeping audio sequence header just in case the "
                            "new metadata didn't come yet")
                 return
             else:
-                addHeader(flvTag)
+                self.debug("Audio stream sequence header received")
+                self._addHeader(flvTag)
+                self._gotAudioHeader = True
+                self._tryStarting()
                 return
         elif self._needAudioHeader and self._backupAudioHeader:
+            # There have been changes and we are waiting for a header tag but
+            # what we got is a normal audio tag. It came earlier than expected
+            # before the changes could be detected so we're sending it now.
             self.debug("Sending earlier audio header")
-            addHeader(self._backupAudioHeader)
+            self._addHeader(self._backupAudioHeader)
+            self._gotAudioHeader = True
             self._backupAudioHeader = None
 
         buffer = self._buildDataBuffer(fixedTime, flvTag)
@@ -276,25 +280,29 @@ class FMSApplication(server.Application, log.Loggable):
         fixedTime = self._fixeTimestamp(time)
         flvTag = tags.create_flv_tag(TAG_TYPE_VIDEO, data, fixedTime)
 
-        def addHeader(tag):
-            self.debug("Video stream sequence header received")
-            self._addHeader(tag)
-            self._gotVideoHeader = True
-            self._tryStarting()
-
         if tag.h264_packet_type == H264_PACKET_TYPE_SEQUENCE_HEADER:
             assert self._needVideoHeader, "Video header not expected"
             if self._gotVideoHeader:
+                # FMLE might send the sequence header before the new metadata
+                # which screws us up. We keep the tag instead of dropping it
+                # so we can send it latter when the changes are detected.
                 self._backupVideoHeader = flvTag
                 self.debug("Keeping video sequence header, just in case the "
                            "new metadata didn't come yet")
                 return
             else:
-                addHeader(flvTag)
+                self.debug("Video stream sequence header received")
+                self._addHeader(flvTag)
+                self._gotVideoHeader = True
+                self._tryStarting()
                 return
         elif self._needVideoHeader and self._backupVideoHeader:
-            self.debug("Sending earlier audio header")
-            addHeader(self._backupVideoHeader)
+            # There have been changes and we are waiting for a header tag but
+            # what we got is a normal video tag. It came earlier than expected
+            # before the changes could be detected so we're sending it now.
+            self.debug("Sending earlier video header")
+            self._addHeader(self._backupVideoHeader)
+            self._gotVideoHeader = True
             self._backupVideoHeader = None
 
         buffer = self._buildDataBuffer(fixedTime, flvTag)
