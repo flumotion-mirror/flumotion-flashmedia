@@ -53,6 +53,12 @@ class FMSApplication(server.Application, log.Loggable):
         self._stream = None
         self._client = None
 
+        # FMLE is pushing one video buffer and after that lots of audio buffers
+        # before the next video. This is causing synchronization problems.
+        self._synced = False
+        self._previousVideoTimestamp = None
+        self._videoBufferDuration = None
+
         self._published = False
         self._started = False
         self._changed = False
@@ -83,7 +89,11 @@ class FMSApplication(server.Application, log.Loggable):
         self._backlog = []
         self._headers = []
 
+
     def prePublish(self, client, stream):
+        self._synced = False
+        self._previousVideoTimestamp = None
+        self._videoBufferDuration = None
         if stream.publisher:
             if self._component.starving and not self._publishing:
                 try:
@@ -170,6 +180,10 @@ class FMSApplication(server.Application, log.Loggable):
         if self._metadata is None:
             self._metadata = data
 
+        self._videoBufferDuration = 1000 / self._metadata.get('framerate', 10)
+        self._videoBufferDuration += self._videoBufferDuration * 0.10
+        self.log('Video buffer duration: %d', self._videoBufferDuration)
+
         if self._started:
             self.debug("Dropping unchanged meta-data tag")
         else:
@@ -217,7 +231,7 @@ class FMSApplication(server.Application, log.Loggable):
 
         if tag.aac_packet_type == AAC_PACKET_TYPE_SEQUENCE_HEADER:
             assert self._needAudioHeader, "Audio header not expected"
-            if self._gotAudioHeader:
+            if self._gotAudioHeader and not self._synced:
                 # FMLE might send the sequence header before the new metadata
                 # which screws us up. We keep the tag instead of dropping it
                 # so we can send it latter when the changes are detected.
@@ -231,6 +245,9 @@ class FMSApplication(server.Application, log.Loggable):
                 self._gotAudioHeader = True
                 self._tryStarting()
                 return
+        elif not self._synced:
+            self.log('Discarting audio buffer. Video not synced yet')
+            return
         elif self._needAudioHeader and self._backupAudioHeader:
             # There have been changes and we are waiting for a header tag but
             # what we got is a normal audio tag. It came earlier than expected
@@ -277,6 +294,33 @@ class FMSApplication(server.Application, log.Loggable):
             self._needVideoHeader = nh
             self._gotVideoHeader = False
 
+        if not self._synced:
+            if tag.h264_packet_type == H264_PACKET_TYPE_SEQUENCE_HEADER:
+                fixedTime = self._fixeTimestamp(time)
+                flvTag = tags.create_flv_tag(TAG_TYPE_VIDEO, data, fixedTime)
+                self._backupVideoHeader = flvTag
+                return
+            # Looking for a consecutive keyframe before pushing audio buffers
+            if tag.frame_type != FRAME_TYPE_KEYFRAME:
+                self._previousVideoTimestamp = time
+                return
+
+            if not self._previousVideoTimestamp:
+                self._previousVideoTimestamp = time
+                return
+
+            if time - self._previousVideoTimestamp > self._videoBufferDuration:
+                self.log("Got keyframe not in sync with last frame")
+                self._previousVideoTimestamp = time
+                return
+            else:
+                self.log("Got keyframe in sync with last frame")
+                self._synced = True
+
+        self.log("Got video buffer with timestamp %d", time)
+        self.buildAndPushVideoBuffer(data, time, tag)
+
+    def buildAndPushVideoBuffer(self, data, time, tag):
         fixedTime = self._fixeTimestamp(time)
         flvTag = tags.create_flv_tag(TAG_TYPE_VIDEO, data, fixedTime)
 
@@ -317,38 +361,10 @@ class FMSApplication(server.Application, log.Loggable):
         self._disconnect()
         self._component.appError(msg, debug=debug)
 
-    def _streamTraitsError(self, msg, expected, got):
-        changes = []
-
-        for k in expected:
-            if k in got:
-                if expected[k] != got[k]:
-                    changes.append("%s changed from %r to %r"
-                                   % (k, expected[k], got[k]))
-            else:
-                changes.append("%s removed (was %r)"
-                               % (k, expected[k]))
-
-        for k in got:
-            if k not in expected:
-                changes.append("%s added (with value %r)"
-                               % (k, got[k]))
-
-        self._internalError(msg, debug="\n".join(changes))
-
     def _disconnect(self):
         if self._client is not None:
             self.debug("Disconnecting from client")
             self._client.disconnect()
-
-    def _makeAudioInfoHumanReadable(self, info):
-        return {'sound_format': sound_format_to_string[info['format']],
-                'sample_rate': sound_rate_to_string[info['rate']],
-                'sample_size': sound_size_to_string[info['size']],
-                'sound_type': sound_type_to_string[info['type']]}
-
-    def _makeVideoInfoHumanReadable(self, info):
-        return {'video_codec': codec_id_to_string[info['codec']]}
 
     def _fixeTimestamp(self, timestamp):
         """Given a timestamp finds out wether it is valid depending on the last
@@ -450,6 +466,12 @@ class FMSApplication(server.Application, log.Loggable):
         caps = gst.caps_from_string("video/x-flv")
         caps[0]['streamheader'] = (buffer,) + tuple(self._headers)
         self._component.setStreamCaps(caps)
+
+        if self._changed:
+            self.debug("RESET: send event downstream")
+            self._component.sendEvent(gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM,
+                                                       gst.Structure('flumotion-reset')))
+
 
         for buffer in self._backlog:
             self._component.pushStreamBuffer(buffer)
@@ -578,6 +600,10 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
     def pushStreamBuffer(self, buffer):
         self._bufferCount += 1
         self._source.emit('push-buffer', buffer)
+
+    def sendEvent(self, event):
+        self.log('Sending flumotion-reset event downstream')
+        self._source.get_pad('src').get_peer().send_event(event)
 
     def _scheduleMonitoring(self):
         dc = reactor.callLater(self.MONITORING_FREQUENCY, self._doMonitoring)
