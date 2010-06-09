@@ -1,3 +1,10 @@
+2010-06-09  Xavier Queralt Mateu  <xqueralt@flumotion.com>
+
+	reviewed by: jribas
+
+	* flumotion/component/producers/fms/fms.py:
+	Send reset always before starting streaming
+
 2010-05-19  Josep Joan Ribas  <jribas@flumotion.com>
 
 	reviewed by: xqueralt

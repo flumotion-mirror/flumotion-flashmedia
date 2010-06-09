@@ -466,12 +466,10 @@ class FMSApplication(server.Application, log.Loggable):
         caps = gst.caps_from_string("video/x-flv")
         caps[0]['streamheader'] = (buffer,) + tuple(self._headers)
         self._component.setStreamCaps(caps)
-
-        if self._changed:
-            self.debug("RESET: send event downstream")
-            self._component.sendEvent(gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM,
+        
+        self.debug("RESET: send event downstream")
+        self._component.sendEvent(gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM,
                                                        gst.Structure('flumotion-reset')))
-
 
         for buffer in self._backlog:
             self._component.pushStreamBuffer(buffer)
