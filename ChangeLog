@@ -1,3 +1,9 @@
+2010-07-21  Xavier Queralt  <xqueralt@flumotion.com>
+
+	* flumotion/component/producers/fms/fms.xml:
+	Change deprecated attribute 'description' by '_description' and add
+	some missing descriptions too
+
 2010-06-09  Xavier Queralt Mateu  <xqueralt@flumotion.com>
 
 	reviewed by: jribas

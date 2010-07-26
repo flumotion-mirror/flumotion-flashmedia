@@ -1,7 +1,8 @@
 <registry>
   <components>
     <component type="flash-media-server-producer"
-               base="flumotion/component/producers/fms">
+               base="flumotion/component/producers/fms"
+               _description="Produce from a Flash Media Encoder" >
       <source location="flumotion.component.producers.fms.fms"/>
       <feeder name="default"/>
 
@@ -12,9 +13,9 @@
 
       <properties>
         <property name="port" type="int"
-                  description="Port to listen on (default: 1935)" />
+                  _description="Port to listen on (default: 1935)" />
         <property name="mount-point" type="string"
-                  description="The mount point the stream is to be produced on. It must be absolute and have at least two parts. (default: /live/stream.flv)" />
+                  _description="The mount point the stream is to be produced on. It must be absolute and have at least two parts. (default: /live/stream.flv)" />
       </properties>
     </component>
   </components>
