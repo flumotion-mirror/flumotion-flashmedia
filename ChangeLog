@@ -1,3 +1,16 @@
+2010-08-09  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* Makefile.am:
+	* autogen.sh:
+	* configure.ac:
+	* m4 (added):
+	* po (added):
+	* po/LINGUAS (added):
+	* po/nl.po (added):
+	* po/Makevars (added):
+	* po/POTFILES.in (added):
+	  Make module translatable.
+
 2010-07-21  Xavier Queralt  <xqueralt@flumotion.com>
 
 	* flumotion/component/producers/fms/fms.xml:

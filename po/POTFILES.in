@@ -1,0 +1,3 @@
+# List of source files which contain translatable strings.
+flumotion/component/producers/fms/fms.py
+flumotion/component/producers/fms/live.py

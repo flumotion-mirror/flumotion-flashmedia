@@ -5,17 +5,28 @@ AC_INIT(flumotion-flashmedia, 0.1.0.1,
 AM_INIT_AUTOMAKE([-Wno-portability])
 
 AS_VERSION
+
 AS_NANO
 
 AC_SUBST_FILE(AUTHORS)
 AUTHORS=$srcdir/AUTHORS
+
+dnl Add parameters for aclocal
+AC_SUBST(ACLOCAL_AMFLAGS, "-I m4 -I common")
+
+dnl set up gettext
+dnl the version check needs to stay here because autopoint greps for it
+AM_GNU_GETTEXT_VERSION([0.17])
+AM_GNU_GETTEXT([external])
+
+GETTEXT_PACKAGE=$PACKAGE
+AC_SUBST(GETTEXT_PACKAGE)
 
 AC_SUBST(FLU_REQ, 0.5.4)
 GST_010_SUPPORTED=yes
 AC_SUBST(GST_010_SUPPORTED)
 
 AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
-AC_SUBST(ACLOCAL_AMFLAGS, "-I common")
 
 AS_AC_EXPAND(LIBDIR, $libdir)
 AC_MSG_NOTICE(Storing library files in $LIBDIR)
@@ -96,4 +107,5 @@ flumotion/component/producers/fms/Makefile
 flumotion/project/Makefile
 flumotion/project/flashmedia.py
 flumotion-flashmedia.spec
+po/Makefile.in
 )
