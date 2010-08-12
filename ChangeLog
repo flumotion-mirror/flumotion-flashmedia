@@ -1,3 +1,8 @@
+2010-08-10  Xavier Queralt  <xqueralt@flumotion.com>
+
+	* configure.ac:
+	Require a lower gettext version
+
 2010-08-09  Thomas Vander Stichele  <thomas at apestaart dot org>
 
 	* Makefile.am:
