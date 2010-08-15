@@ -1,0 +1,52 @@
+Flash stream coming from FME
+	packet
+		timestamp in ms, 24 bit int
+		zero-based since start of stream
+		flag whether this starts on a keyframe
+	packets
+		header packet
+			is there audio ?
+			is there video ?
+		metadata packet
+			contains framerate, samplerate, ...
+		optional codec data packet for audio
+		optional codec data packet for video
+		series of audio and video packets
+		video
+			one frame per packet
+			doesn't seem perfect, timestamps fluctuate a little (jitter) but seem to not drift
+	muxing
+		timestamps are monotonically increasing across packets
+	notes
+		with webcam, first video packets arrive after about 2 secs
+		TODO: check what the behaviour is here with Firewire, since that most likely has video and audio from the start and thus should have video starting sooner
+flash-media-server-producer
+	on first or reconnection, drops all non-keyframe buffers
+	after reconnection, rewrite timestamps to pretend they're contiguous
+		FME on a reconfigure/restart restarts from 0
+		delta calculated as timestamp of last seen timestamp minus first new one, then applied equally to all subsequent packets
+generic decoder
+	muxed flv stream gets decoded
+	since timestamps are not accurate (ms resolution), this should be accounted for in generic decoder
+	fme's jitter on video might be
+		either genuine jitter in capture time
+		or a jitter because it's resampling to sync with the audio.
+		in both cases, we can assume it's correct timing info
+			in which case a videorate after is fine to smooth out
+	no check done on audio - do the timestamps and samples that can be decoded line up ?
+		44.1 Khz mp3 stream has frames of 1152 stereo samples
+References
+	flvlib
+		http://wulczer.org/
+TODO
+	figure out how demuxer and decoders treat incoming buffer metadat:
+		do they maintain timestamps ?
+		do they set a duration correctly ?
+		do they create a perfect stream ?
+	figure out firewire
+	add example dumps of an FME live stream made with
+		flvlib
+		gst on the flv stream
+		gst on audio/video right after decoding
+		gst on audio/video right after encoding
+	explain the synchronized retimestamping in decoder
