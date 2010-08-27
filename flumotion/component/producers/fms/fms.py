@@ -540,7 +540,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         self.starving = False
 
     def get_pipeline_string(self, properties):
-        return 'appsrc name=source caps=video/x-flv'
+        return 'appsrc name=source'
 
     def configure_pipeline(self, pipeline, properties):
         self._source = self.pipeline.get_by_name("source")
@@ -594,6 +594,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
 
     def setStreamCaps(self, caps):
         self._source.props.caps = caps
+        self._source.get_pad('src').set_caps(caps)
 
     def pushStreamBuffer(self, buffer):
         self._bufferCount += 1

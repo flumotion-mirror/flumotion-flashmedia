@@ -1,3 +1,11 @@
+2010-08-27  Xavier Queralt  <xqueralt@flumotion.com>
+
+	* flumotion/component/producers/fms/fms.py:
+	Set the caps to the output pad just when we have the real caps (with
+	the streamheader). Otherwise the negotiation is done without the
+	streamheader and the stream cannot be parsed properly on the other
+	side.
+
 2010-08-10  Xavier Queralt  <xqueralt@flumotion.com>
 
 	* configure.ac:
