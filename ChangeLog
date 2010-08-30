@@ -1,3 +1,11 @@
+2010-08-30  Xavier Queralt  <xqueralt@flumotion.com>
+
+	reviewed by: Josep Joan Ribas <jribas@flumotion.com>
+
+	* flumotion/component/producers/fms/fms.py:
+	If there is no framerate, no way we're going to expect audio. Set the
+	stream as synced and start processing the audio buffers.
+
 2010-08-27  Xavier Queralt  <xqueralt@flumotion.com>
 
 	* flumotion/component/producers/fms/fms.py:

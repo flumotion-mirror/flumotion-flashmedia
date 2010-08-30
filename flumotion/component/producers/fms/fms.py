@@ -173,6 +173,9 @@ class FMSApplication(server.Application, log.Loggable):
         if self._creationdate:
             data["creationdate"] = self._creationdate
 
+        if 'framerate' not in data:
+            self._synced = True
+
         if self._metadata and self._metadata != data:
             self.debug("RTMP stream meta-data changed.")
             self._clear()
