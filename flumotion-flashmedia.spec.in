@@ -35,15 +35,14 @@ make
 %install
 rm -rf $RPM_BUILD_ROOT
 
-%makeinstall
+make DESTDIR=$RPM_BUILD_ROOT install
 
-# %find_lang flumotion-flashmedia
+%find_lang flumotion-flashmedia
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-# %files -f flumotion-flashmedia.lang
-%files
+%files -f flumotion-flashmedia.lang
 %defattr(-,root,root,-)
 %doc ChangeLog COPYING README AUTHORS
 %{_libdir}/flumotion
