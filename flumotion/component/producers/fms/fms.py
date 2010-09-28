@@ -109,7 +109,9 @@ class FMSApplication(server.Application, log.Loggable):
         return self.onPublish(client, stream)
 
     def onPublish(self, client, stream):
-        self.debug("Client %r publishing stream %s", client, stream.name)
+        peer = client.protocol.transport.getPeer()
+        self.info("Client %s:%d publishing stream %s", peer.host, peer.port,
+            stream.name)
 
         # If we failed we just refuse everything
         if self._failed:
@@ -127,6 +129,8 @@ class FMSApplication(server.Application, log.Loggable):
         self._publishing = False
 
     def onDisconnect(self, client):
+        peer = client.protocol.transport.getPeer()
+        self.info("Client %s:%d disconnected", peer.host, peer.port)
         server.Application.onDisconnect(self, client)
         if client == self._client:
             self._client = None
@@ -135,7 +139,7 @@ class FMSApplication(server.Application, log.Loggable):
         self.debug("Stream %s published", self._streamName)
 
         if self._published:
-            self._internalError('Client try to publish multiple times')
+            self._internalError('Client tried to publish multiple times')
             return
 
         self._published = True
@@ -144,7 +148,7 @@ class FMSApplication(server.Application, log.Loggable):
         self.debug("Stream %s unpublished", self._streamName)
 
         if not self._published:
-            self._internalError("Client try to unpublish a "
+            self._internalError("Client tried to unpublish a "
                                 "stream not yet published")
             return
 
@@ -174,6 +178,8 @@ class FMSApplication(server.Application, log.Loggable):
             data["creationdate"] = self._creationdate
 
         if 'framerate' not in data:
+            self.debug('No framerate in metadata, '
+                'so considering audio only hence synced')
             self._synced = True
 
         if self._metadata and self._metadata != data:
@@ -183,9 +189,14 @@ class FMSApplication(server.Application, log.Loggable):
         if self._metadata is None:
             self._metadata = data
 
+        # FIXME: why default to a framerate of 10 ?
+        # FIXME: why do integer division here ?
+        # FIXME: why adding 10% ?
+        # FIXME: is framerate trustable at all ? I've seen 1000 being sent
+        #        by ffmpeg for no apparent reason
         self._videoBufferDuration = 1000 / self._metadata.get('framerate', 10)
         self._videoBufferDuration += self._videoBufferDuration * 0.10
-        self.log('Video buffer duration: %d', self._videoBufferDuration)
+        self.log('Video buffer duration: %d ms', self._videoBufferDuration)
 
         if self._started:
             self.debug("Dropping unchanged meta-data tag")
@@ -249,7 +260,7 @@ class FMSApplication(server.Application, log.Loggable):
                 self._tryStarting()
                 return
         elif not self._synced:
-            self.log('Discarting audio buffer. Video not synced yet')
+            self.log('Discarding audio buffer. Video not synced yet')
             return
         elif self._needAudioHeader and self._backupAudioHeader:
             # There have been changes and we are waiting for a header tag but
@@ -305,6 +316,7 @@ class FMSApplication(server.Application, log.Loggable):
                 return
             # Looking for a consecutive keyframe before pushing audio buffers
             if tag.frame_type != FRAME_TYPE_KEYFRAME:
+                self.log("Got non-keyframe at time %r" % time)
                 self._previousVideoTimestamp = time
                 return
 
@@ -312,12 +324,14 @@ class FMSApplication(server.Application, log.Loggable):
                 self._previousVideoTimestamp = time
                 return
 
+            self.log("time %r, previous video timestamp %r, buffer duration %r",
+                time, self._previousVideoTimestamp, self._videoBufferDuration)
             if time - self._previousVideoTimestamp > self._videoBufferDuration:
                 self.log("Got keyframe not in sync with last frame")
                 self._previousVideoTimestamp = time
                 return
             else:
-                self.log("Got keyframe in sync with last frame")
+                self.debug("Got keyframe in sync with last frame, so considering synced")
                 self._synced = True
 
         self.log("Got video buffer with timestamp %d", time)
@@ -577,10 +591,10 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         self._scheduleMonitoring()
 
         try:
-            self.debug('Listening on %d' % self._port)
+            self.debug('Listening on TCP port %d' % self._port)
             reactor.listenTCP(self._port, factory)
         except error.CannotListenError:
-            t = 'Port %d is not available.' % self._port
+            t = 'TCP port %d is not available.' % self._port
             self.warning(t)
             m = Error(T_(N_(
                 "Network error: TCP port %d is not available."), self._port))

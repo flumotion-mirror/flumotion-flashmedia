@@ -1,3 +1,10 @@
+2010-09-29  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* flumotion/component/producers/fms/fms.py:
+	  Add comments, including FIXME for missing comments.
+	  Log at INFO level when a client connects and disconnects.
+	  Fix some typos and log messages.
+
 2010-08-30  Xavier Queralt  <xqueralt@flumotion.com>
 
 	* flumotion-flashmedia.spec.in:
