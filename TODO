@@ -1,1 +1,3 @@
-* EASY		put stuff in here
+* EASY		log a new incoming connection when it happens at INFO level.
+                ATM, when just starting the component, the first connection
+                before it goes HUNGRY might not actually work and fail silently.
