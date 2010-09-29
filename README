@@ -2,3 +2,16 @@ Dependencies
 ------------
 
 flvlib - http://osflash.org/flvlib
+
+Testing
+-------
+
+Streaming from a file and save it to disk:
+ - start server:
+FLU_DEBUG=4 flumotion-launch flash-media-server-producer ! disk-consumer directory=/tmp
+
+ - start client:
+  ffmpeg -debug -i holly.mp4 -re -acodec copy -vcodec copy -f flv rtmp://level.fluendo.fluendo.lan/live/stream.flv
+
+Server should go from hungry to happy, and report first received buffers
+and timestamps for audio and video.
