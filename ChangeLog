@@ -3,6 +3,8 @@
 	* flumotion/component/producers/fms/fms.py:
 	  Add more debugging, so we clearly see when we receive the first
 	  buffer for audio and video, and when we send them.
+	  Don't trust bogus announcements of 1000 fps as framerate;
+	  put in a hack to force it to 25 fps in that case.
 
 2010-09-29  Thomas Vander Stichele  <thomas at apestaart dot org>
 
