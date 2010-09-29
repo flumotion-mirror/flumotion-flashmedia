@@ -77,6 +77,12 @@ class FMSApplication(server.Application, log.Loggable):
         self._needAudioHeader = False
         self._needVideoHeader = False
 
+        self._firstAudioReceived = False
+        self._firstVideoReceived = False
+
+        self._firstAudioSent = False
+        self._firstVideoSent = False
+
         self._gotAudioHeader = False
         self._gotVideoHeader = False
 
@@ -189,6 +195,13 @@ class FMSApplication(server.Application, log.Loggable):
         if self._metadata is None:
             self._metadata = data
 
+        # a framerate of 1000 sounds unlikely, but seems to happen a lot
+        # when ffmpeg streams an .flv file.  Adjust it.
+        if self._metadata and self._metadata.get('framerate', None) == 1000:
+            self.warning(
+                'Client claims framerate is 1000 fps.  Adjusting to 25 fps.')
+            self._metadata['framerate'] = 25
+
         # FIXME: why default to a framerate of 10 ?
         # FIXME: why do integer division here ?
         # FIXME: why adding 10% ?
@@ -206,6 +219,11 @@ class FMSApplication(server.Application, log.Loggable):
             self._tryStarting()
 
     def audioDataReceived(self, data, time):
+        if not self._firstAudioReceived:
+            self.info('Received first audio buffer with timestamp %d ms',
+                time)
+            self._firstAudioReceived = True
+
         self.log("Audio frame: %d ms, %d bytes", time, len(data))
 
         if not self._published:
@@ -274,9 +292,19 @@ class FMSApplication(server.Application, log.Loggable):
         buffer = self._buildDataBuffer(fixedTime, flvTag)
         buffer.flag_set(gst.BUFFER_FLAG_DELTA_UNIT)
 
+        if not self._firstAudioSent:
+            self.info('Sending first audio buffer for time %d ms '
+                'with adjusted time %d ms', time, fixedTime)
+            self._firstAudioSent = True
+
         self._pushStreamBuffer(buffer)
 
     def videoDataReceived(self, data, time):
+        if not self._firstVideoReceived:
+            self.info('Received first video buffer with timestamp %d ms',
+                time)
+            self._firstVideoReceived = True
+
         self.log("Video frame: %d ms, %d bytes", time, len(data))
 
         if not self._published:
@@ -331,7 +359,8 @@ class FMSApplication(server.Application, log.Loggable):
                 self._previousVideoTimestamp = time
                 return
             else:
-                self.debug("Got keyframe in sync with last frame, so considering synced")
+                self.debug("Got video keyframe with timestamp %r "
+                    "in sync with last frame, so considering synced" % time)
                 self._synced = True
 
         self.log("Got video buffer with timestamp %d", time)
@@ -339,6 +368,11 @@ class FMSApplication(server.Application, log.Loggable):
 
     def buildAndPushVideoBuffer(self, data, time, tag):
         fixedTime = self._fixeTimestamp(time)
+        if not self._firstVideoSent:
+            self.info('Sending first video buffer for time %d ms '
+                'with adjusted time %d ms', time, fixedTime)
+            self._firstVideoSent = True
+
         flvTag = tags.create_flv_tag(TAG_TYPE_VIDEO, data, fixedTime)
 
         if tag.h264_packet_type == H264_PACKET_TYPE_SEQUENCE_HEADER:
@@ -454,7 +488,7 @@ class FMSApplication(server.Application, log.Loggable):
         self._start()
 
     def _start(self):
-        self.debug("Starting streaming")
+        self.info("Starting feeding")
 
         hasVideo = True
         if not self._videoinfo:
@@ -488,9 +522,11 @@ class FMSApplication(server.Application, log.Loggable):
         self._component.sendEvent(gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM,
                                                        gst.Structure('flumotion-reset')))
 
-        for buffer in self._backlog:
-            self._component.pushStreamBuffer(buffer)
-        self._backlog = []
+        if self._backlog:
+            self.debug("Flushing backlog of %d buffers", len(self._backlog))
+            for buffer in self._backlog:
+                self._component.pushStreamBuffer(buffer)
+            self._backlog = []
 
         self._started = True
         self._changed = False
