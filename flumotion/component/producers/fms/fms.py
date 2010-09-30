@@ -53,19 +53,14 @@ class FMSApplication(server.Application, log.Loggable):
         self._stream = None
         self._client = None
 
-        # FMLE is pushing one video buffer and after that lots of audio buffers
-        # before the next video. This is causing synchronization problems.
-        self._synced = False
-        self._previousVideoTimestamp = None
-        self._videoBufferDuration = None
-
         self._published = False
         self._started = False
         self._changed = False
         self._failed = False
         self._publishing = False
 
-        self._lastTimestamp = 0
+        self._syncTimestamp = -1
+        self._syncOffset = -1
         self._totalTime = 0
 
         self._creationdate = None
@@ -97,9 +92,6 @@ class FMSApplication(server.Application, log.Loggable):
 
 
     def prePublish(self, client, stream):
-        self._synced = False
-        self._previousVideoTimestamp = None
-        self._videoBufferDuration = None
         if stream.publisher:
             if self._component.starving and not self._publishing:
                 try:
@@ -160,7 +152,8 @@ class FMSApplication(server.Application, log.Loggable):
 
         self._stream.removeSubscriber(self)
         self._stream = None
-        self._lastTimestamp = 0
+        self._syncTimestamp = -1
+        self._syncOffset = -1
 
         self._published = False
 
@@ -183,11 +176,6 @@ class FMSApplication(server.Application, log.Loggable):
         if self._creationdate:
             data["creationdate"] = self._creationdate
 
-        if 'framerate' not in data:
-            self.debug('No framerate in metadata, '
-                'so considering audio only hence synced')
-            self._synced = True
-
         if self._metadata and self._metadata != data:
             self.debug("RTMP stream meta-data changed.")
             self._clear()
@@ -201,15 +189,6 @@ class FMSApplication(server.Application, log.Loggable):
             self.warning(
                 'Client claims framerate is 1000 fps.  Adjusting to 25 fps.')
             self._metadata['framerate'] = 25
-
-        # FIXME: why default to a framerate of 10 ?
-        # FIXME: why do integer division here ?
-        # FIXME: why adding 10% ?
-        # FIXME: is framerate trustable at all ? I've seen 1000 being sent
-        #        by ffmpeg for no apparent reason
-        self._videoBufferDuration = 1000 / self._metadata.get('framerate', 10)
-        self._videoBufferDuration += self._videoBufferDuration * 0.10
-        self.log('Video buffer duration: %d ms', self._videoBufferDuration)
 
         if self._started:
             self.debug("Dropping unchanged meta-data tag")
@@ -263,22 +242,10 @@ class FMSApplication(server.Application, log.Loggable):
 
         if tag.aac_packet_type == AAC_PACKET_TYPE_SEQUENCE_HEADER:
             assert self._needAudioHeader, "Audio header not expected"
-            if self._gotAudioHeader and not self._synced:
-                # FMLE might send the sequence header before the new metadata
-                # which screws us up. We keep the tag instead of dropping it
-                # so we can send it latter when the changes are detected.
-                self._backupAudioHeader = flvTag
-                self.debug("Keeping audio sequence header just in case the "
-                           "new metadata didn't come yet")
-                return
-            else:
-                self.debug("Audio stream sequence header received")
-                self._addHeader(flvTag)
-                self._gotAudioHeader = True
-                self._tryStarting()
-                return
-        elif not self._synced:
-            self.log('Discarding audio buffer. Video not synced yet')
+            self.debug("Audio stream sequence header received")
+            self._addHeader(flvTag)
+            self._gotAudioHeader = True
+            self._tryStarting()
             return
         elif self._needAudioHeader and self._backupAudioHeader:
             # There have been changes and we are waiting for a header tag but
@@ -336,45 +303,25 @@ class FMSApplication(server.Application, log.Loggable):
             self._needVideoHeader = nh
             self._gotVideoHeader = False
 
-        if not self._synced:
-            if tag.h264_packet_type == H264_PACKET_TYPE_SEQUENCE_HEADER:
-                fixedTime = self._fixeTimestamp(time)
-                flvTag = tags.create_flv_tag(TAG_TYPE_VIDEO, data, fixedTime)
-                self._backupVideoHeader = flvTag
-                return
-            # Looking for a consecutive keyframe before pushing audio buffers
-            if tag.frame_type != FRAME_TYPE_KEYFRAME:
-                self.log("Got non-keyframe at time %r" % time)
-                self._previousVideoTimestamp = time
-                return
-
-            if not self._previousVideoTimestamp:
-                self._previousVideoTimestamp = time
-                return
-
-            self.log("time %r, previous video timestamp %r, buffer duration %r",
-                time, self._previousVideoTimestamp, self._videoBufferDuration)
-            if time - self._previousVideoTimestamp > self._videoBufferDuration:
-                self.log("Got keyframe not in sync with last frame")
-                self._previousVideoTimestamp = time
-                return
-            else:
-                self.debug("Got video keyframe with timestamp %r "
-                    "in sync with last frame, so considering synced" % time)
-                self._synced = True
-
         self.log("Got video buffer with timestamp %d", time)
         self.buildAndPushVideoBuffer(data, time, tag)
 
     def buildAndPushVideoBuffer(self, data, time, tag):
-        fixedTime = self._fixeTimestamp(time)
+        if tag.h264_packet_type == H264_PACKET_TYPE_END_OF_SEQUENCE:
+            # the timestamp of this buffer is not continious and is sent
+            # after the reconnection with a weird timestamp. use the last
+            # timestamp for it.
+      	    fixedTime = self._fixeTimestamp(self._totalTime)
+        else:
+            fixedTime = self._fixeTimestamp(time)
+
         if not self._firstVideoSent:
             self.info('Sending first video buffer for time %d ms '
                 'with adjusted time %d ms', time, fixedTime)
             self._firstVideoSent = True
 
         flvTag = tags.create_flv_tag(TAG_TYPE_VIDEO, data, fixedTime)
-
+        
         if tag.h264_packet_type == H264_PACKET_TYPE_SEQUENCE_HEADER:
             assert self._needVideoHeader, "Video header not expected"
             if self._gotVideoHeader:
@@ -420,13 +367,20 @@ class FMSApplication(server.Application, log.Loggable):
     def _fixeTimestamp(self, timestamp):
         """Given a timestamp finds out wether it is valid depending on the last
         timestamp sent. If the timestamp we receive is in the past it is fixed
-        to be contiguous with the previous.
+        to be contiguous with the previous keeping the sync of audio and video.
         """
+        if self._syncOffset == -1 or self._syncTimestamp == -1:
+            self.debug("Adding new sync point at %s" % self._totalTime)
+            # we want to re-timestamp from the timestamp of the last buffer
+            # pushed, but not the same exact time. that's why we to the sync
+            # point 40ms 
+            self._syncTimestamp = self._totalTime + 40
+            self._syncOffset = timestamp
+
         fixedTimestamp = timestamp
 
         if timestamp < self._totalTime:
-            fixedTimestamp = self._totalTime + timestamp - self._lastTimestamp
-            self._lastTimestamp = timestamp
+            fixedTimestamp = self._syncTimestamp - self._syncOffset + timestamp
 
         if fixedTimestamp < 0:
             self._internalError("Timestamp cannot be < 0")
@@ -554,7 +508,8 @@ class FMSApplication(server.Application, log.Loggable):
 
         self._videoEnabled = False
         self._audioEnabled = False
-        self._lastTimestamp = 0
+        self._syncTimestamp = -1
+        self._syncOffset = -1
 
         self._headers = []
 

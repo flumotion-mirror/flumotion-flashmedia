@@ -1,3 +1,30 @@
+2010-09-30  Andoni Morales Alastruey  <amorales@flumotion.com>
+
+	reviewed by: Sebastien Merle 
+	* flumotion/component/producers/fms/fms.py:
+	Fix re-timestamping and synchronisation.
+
+	A trailing video buffer is sent after the reconnection with a weird
+	timestamp (non-contiguous).It was causing gaps in the re-timestamping
+	and introducing desyncs. This was fixed dropping buffers until we get
+	a continous keyframe.
+
+	Now that we know that this buffer is an H264 END_OF_SEQUENCE packet,
+	we can set its timeamp to the last one received and start
+	re-timestamping the next buffers from this resync point.
+	The re-timestamping logic is more simple and robust:
+	fixedTS = syncTS - syncOffset + timestamp
+
+	Example:
+	We received the last buffer with ts=10000. After the reconnection
+	buffer1 has ts=100 and buffer2 has ts=140. We set syncTS=10000+x (where x
+	is set to 40ms because a gap is needed from the last timestamp) and 
+	syncOffset=100
+	We get after fixing the timestamps:
+	buffer1 -> ts=10040
+	buffer2 -> ts=10080
+		
+
 2010-09-29  Thomas Vander Stichele  <thomas at apestaart dot org>
 
 	* flumotion/component/producers/fms/fms.py:
