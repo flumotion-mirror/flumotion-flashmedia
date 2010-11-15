@@ -107,7 +107,7 @@ class FMSApplication(server.Application, log.Loggable):
         return self.onPublish(client, stream)
 
     def onPublish(self, client, stream):
-        peer = client.protocol.transport.getPeer()
+        peer = client.nc.transport.getPeer()
         self.info("Client %s:%d publishing stream %s", peer.host, peer.port,
             stream.name)
 
@@ -123,11 +123,16 @@ class FMSApplication(server.Application, log.Loggable):
 
         self._client = client
         self._stream = stream
-        stream.addSubscriber(self)
+        self.addSubscriber(stream, self)
         self._publishing = False
+        self.streamPublished()
+
+    def unpublish(self):
+        #TODO: Do wathever we need to do when the stream is unpublished
+        self.streamUnpublished()
 
     def onDisconnect(self, client):
-        peer = client.protocol.transport.getPeer()
+        peer = client.nc.transport.getPeer()
         self.info("Client %s:%d disconnected", peer.host, peer.port)
         server.Application.onDisconnect(self, client)
         if client == self._client:
