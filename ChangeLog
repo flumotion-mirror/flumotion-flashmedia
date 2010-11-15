@@ -1,3 +1,10 @@
+2010-11-15  Xavier Queralt  <xqueralt@flumotion.com>
+
+	reviewed by: jribas
+
+	* flumotion/component/producers/fms/live.py:
+	Modifications to be compatible with new rtmpy
+
 2010-09-30  Andoni Morales Alastruey  <amorales@flumotion.com>
 
 	reviewed by: Sebastien Merle 

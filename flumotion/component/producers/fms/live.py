@@ -1,20 +1,13 @@
-
 """
 A port of the main.asc from the live application included in FMS's sample
 applications.
 """
 
-import sys, os.path
+import os.path
 
-import re
 import pyamf.util
-from twisted.internet import defer, reactor
 
-from rtmpy import server, rtmp
-
-
-# Uncomment this to see lots of debugging output
-# rtmp.DEBUG = True
+from rtmpy import server
 
 
 class FLVWriter(object):
@@ -113,32 +106,38 @@ class FLVWriter(object):
     def _writeData(self, kind, time, data):
         """
         """
-        if time < self.lastTimestamp:
-            raise RuntimeError('Negative timestamp detected %r' % (time,))
-
-        t = time + self.totalTime
-
-        if t < 0:
+        if time < 0:
             raise ValueError('timestamp cannot be < 0')
 
-        if t > 0xffffffff:
-            raise OverflowError('timestamp too high %r' % (t,))
+        if time > 0xffffffff:
+            raise OverflowError('timestamp too high %r' % (time,))
 
         if not self.headerWritten:
             self._writeHeader()
 
             # PreviousTag0
             self.buffer.write_ulong(0)
+            # empty audio tag -
+            self.buffer.write('\x08\x00\x00\x00\x00\x00\x00\x00\xEC\xF4\x1B\x00\x00\x00\x0B')
+
+        if self.firstTimestamp is None:
+            self.firstTimestamp = time
+
+        time = time - self.firstTimestamp + self.totalTime
+
+        if time < 0:
+            time = 0
+
+        self.previousTimestamp = time
 
         l = len(data)
-        self.lastTimestamp = time
 
         self.buffer.write_uchar(kind)
         self.buffer.write_24bit_uint(l)
 
         # timestamp
-        self.buffer.write_24bit_uint(t & 0xffffff)
-        self.buffer.write_uchar(t >> 24)
+        self.buffer.write_24bit_uint(time & 0xffffff)
+        self.buffer.write_uchar(time >> 24)
 
         # StreamID (always 0)
         self.buffer.write_24bit_uint(0)
@@ -148,7 +147,7 @@ class FLVWriter(object):
 
         self._flush()
 
-    def streamPublished(self):
+    def start(self):
         """
         Prepare to receive FLV data.
         """
@@ -156,9 +155,10 @@ class FLVWriter(object):
             raise RuntimeError('Already active')
 
         self.active = True
-        self.lastTimestamp = 0
+        self.firstTimestamp = None
+        self.previousTimestamp = 0
 
-    def streamUnpublished(self):
+    def stop(self):
         """
         FLV data is complete.
         """
@@ -168,7 +168,9 @@ class FLVWriter(object):
         self.flush()
 
         self.active = False
-        self.totalTime += self.lastTimestamp
+        self.totalTime = self.previousTimestamp
+        # empty audio tag -
+        self.buffer.write('\x08\x00\x00\x00\x00\x00\x00\x00\xEC\xF4\x1B\x00\x00\x00\x0B')
 
     def onMetaData(self, data):
         """
@@ -184,8 +186,8 @@ class FLVWriter(object):
         else:
             self.metaData = data
 
-        b = pyamf.encode('onMetaData', self.metaData).getvalue()
-        self._writeData(FLVWriter.META_DATA, self.lastTimestamp, b)
+        b = pyamf.encode('onMetaData', self.metaData, encoding=pyamf.AMF0).getvalue()
+        self._writeData(FLVWriter.META_DATA, self.previousTimestamp, b)
 
     def audioDataReceived(self, data, time):
         """
@@ -196,9 +198,6 @@ class FLVWriter(object):
         @param time: The timestamp associated with the data.
         @type data: C{int}
         """
-        if not self.active:
-            raise RuntimeError('Audio data received without being active')
-
         self._writeData(FLVWriter.AUDIO_DATA, time, data)
 
     def videoDataReceived(self, data, time):
@@ -210,9 +209,6 @@ class FLVWriter(object):
         @param time: The timestamp associated with the data.
         @type data: C{int}
         """
-        if not self.active:
-            raise RuntimeError('Video data received without being active')
-
         self._writeData(FLVWriter.VIDEO_DATA, time, data)
 
 
@@ -226,9 +222,6 @@ class Client(server.Client):
     @note: The functions in this class are just copies from live/main.asc -
         they don't do anything important (it seems).
     """
-
-    def __init__(self, *args, **kwargs):
-        server.Client.__init__(self, *args, **kwargs)
 
     def FCPublish(self, streamname):
         """
@@ -282,30 +275,6 @@ class LiveStreamingApplication(server.Application):
     def startup(self):
         self.writers = {}
 
-    def onConnect(self, client, **kwargs):
-        """
-        Called when connection request has been made by the client. C{False}
-        must be returned if the application rejects the client. A
-        L{twisted.internet.defer.Deferred} can also be returned (the same rule
-        still applies).
-
-        @param client: The client object attempting to connect to this
-            application.
-        @type client: An instance of L{LiveStreamingApplication.client} (in
-            this case L{Client})
-        @param kwargs: A dict of key/value pairs that were sent as part of the
-            connection request.
-        @return: A L{twisted.internet.defer.Deferred} or a C{bool}. Returning
-            a C{False} value will reject the connection.
-        """
-        # TODO: integrate twisted.cred
-        username, password = self.factory.parseCredentials(kwargs['app'])
-
-        if not (username == 'foo' and password == 'bar'):
-            return False
-
-        return True
-
     def getWriter(self, name):
         """
         Returns a L{FLVWriter} corresponding to C{name}.
@@ -337,87 +306,32 @@ class LiveStreamingApplication(server.Application):
 
     def onPublish(self, client, stream):
         """
-        Called when a client is requesting to publish a stream. Return
-        C{False} to reject the publish request (or a L{defer.Deferred} which
-        returns the bool).
         """
-        if os.path.sep in stream.name:
-            return False
-
         writer = self.getWriter(stream.name)
 
         if writer is None:
-            handle = self.getStreamHandle(stream.name)
-            writer = FLVWriter(handle)
-
-            stream.addSubscriber(writer)
-
+            writer = FLVWriter(self.getStreamHandle(stream.name))
             self.setWriter(stream.name, writer)
 
+        self.addSubscriber(stream, writer)
+        writer.start()
 
-class Server(server.ServerFactory):
-    """
-    This class is only necessary to support custom application names. FME does
-    not support argument passing in its connection url so we have to do a
-    workaround.
-
-    An example url:
-      - rtmp://192.168.251.10/live
-
-    To specify a username/password use a specially constructed url like:
-      - rtmp://192.168.251.10/live/username=foo/password=bar
-
-    It is important to note that the username or password cannot contain '/'
-    characters, otherwise the arg parsing will not work.
-    """
-
-    url_re = re.compile('([^\/]*)(\/(username=([^\/]*))?(\/(password=([^\/]*))?)?)?\/?')
-
-    def parseCredentials(self, s):
+    def onUnpublish(self, client, stream):
         """
-        Parses the username/password from an application connection param.
-
-        @param s: The connection string. E.g. 'live/username=foo/password=bar'
-        @type s: C{str}
-        @return: A tuple containing the username and password (in that order).
-            If a match for either is not found, C{None} will be substituted in
-            its place.
         """
-        m = self.url_re.match(s)
+        writer = self.getWriter(stream.name)
 
-        if m is None:
-            return None, None
+        if writer:
+            writer.stop()
 
-        g = m.groups()
-        username, password = None, None
 
-        try:
-            username = g[3]
-        except IndexError:
-            pass
+if __name__ == '__main__':
+    from twisted.internet import reactor
 
-        try:
-            password = g[6]
-        except IndexError:
-            pass
+    app = LiveStreamingApplication()
 
-        return username, password
+    reactor.listenTCP(4340, server.ServerFactory({
+        'live': app
+    }))
 
-    def getApplication(self, name):
-        """
-        Returns the application object based on C{name}. Strips any credential
-        info first.
-
-        @param name: The application name.
-        @type name: C{str}
-        @return: The application object associated with the name. If no such
-            association exists then C{None} should be returned.
-        @rtype: L{server.Application} instance or C{None}.
-        """
-        m = self.url_re.match(name)
-
-        if m is None:
-            return server.ServerFactory.getApplication(self, name)
-
-        return server.ServerFactory.getApplication(self, m.groups()[0])
-
+    reactor.run()
