@@ -3,6 +3,17 @@
 	reviewed by: jribas
 
 	* flumotion/component/producers/fms/fms.py:
+	Implement publishStream method on our application. This way we can
+	check if a given stream has already been published and/or if the client
+	is still alive. If the encoder died or lost the connection without
+	unpublishing/disconnecting, here we can detect it and proceed with the
+	disconnect/unpublish before letting another encoder to publish.
+
+2010-11-15  Xavier Queralt  <xqueralt@flumotion.com>
+
+	reviewed by: jribas
+
+	* flumotion/component/producers/fms/fms.py:
 	Do not remove subscribers. It is done already in a deeper layer.
 
 2010-11-15  Xavier Queralt  <xqueralt@flumotion.com>

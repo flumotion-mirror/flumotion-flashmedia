@@ -19,7 +19,7 @@ from StringIO import StringIO
 from flvlib import tags
 from flvlib.constants import *
 
-from rtmpy import server
+from rtmpy import server, exc
 
 from twisted.internet import reactor, error, defer
 
@@ -62,7 +62,6 @@ class FMSApplication(server.Application, log.Loggable):
         self._started = False
         self._changed = False
         self._failed = False
-        self._publishing = False
 
         self._syncTimestamp = -1
         self._syncOffset = -1
@@ -95,22 +94,6 @@ class FMSApplication(server.Application, log.Loggable):
         self._backlog = []
         self._headers = []
 
-
-    def prePublish(self, client, stream):
-        if stream.publisher:
-            if self._component.starving and not self._publishing:
-                try:
-                    stream.publisher.disconnect()
-                except AttributeError, e:
-                    self.debug("Publisher already disconnected. Caught "
-                               "exception from Client when trying to "
-                               "disconnect: %s", log.getExceptionMessage(e))
-                stream.removePublisher(self._client)
-            else:
-                return False
-        self._publishing = True
-        return self.onPublish(client, stream)
-
     def onPublish(self, client, stream):
         peer = client.nc.transport.getPeer()
         self.info("Client %s:%d publishing stream %s", peer.host, peer.port,
@@ -118,23 +101,52 @@ class FMSApplication(server.Application, log.Loggable):
 
         # If we failed we just refuse everything
         if self._failed:
-            self._publishing = False
-            return False
-
-        if stream.name != self._streamName:
-            self.debug("Stream %s refused", stream.name)
-            self._publishing = False
             return False
 
         self._client = client
         self._stream = stream
         self.addSubscriber(stream, self)
-        self._publishing = False
         self.streamPublished()
+
+    def publishStream(self, client, stream, name, type_):
+        """ Called while publishing the stream. Here we can decide
+        wether the stream can be published or not for that client.
+        """
+        if name != self._streamName:
+            self.debug("Stream %s refused: stream name should be %s",
+                       name, self._streamName)
+            raise exc.BadNameError('%s is not a valid name' % (name,))
+
+        # Check if we have already a client publishing
+        if self._client and client != self._client:
+            self.debug("We have another client publishing %s: Checking "
+                       "its status...", name)
+            if not self._component.starving:
+                # If we are not starving (original client still streaming)
+                # refuse the publish request
+                self.debug("...and it is still publishing. Sorry, but we have "
+                           "to refuse this request")
+                raise exc.BadNameError('%s is already published!' % (name,))
+            else:
+                self.debug("The other client is slacking or is lost: disconnecting and "
+                           "unpublishing the old stream.")
+                self.onDisconnect(self._client)
+                try:
+                    self.unpublishStream(name, self._stream)
+                except exc.BadNameError:
+                    self.debug("Stream %s already unpublished! Going ahead with the publication")
+
+        self.debug("And last! Your stream can be published.")
+        return server.Application.publishStream(self, client, stream, name, type_)
 
     def unpublish(self):
         #TODO: Do wathever we need to do when the stream is unpublished
         self.streamUnpublished()
+
+    def onConnect(self, client, **args):
+        peer = client.nc.transport.getPeer()
+        self.info("Client %s:%d connected", peer.host, peer.port)
+        return server.Application.onConnect(self, client)
 
     def onDisconnect(self, client):
         peer = client.nc.transport.getPeer()
