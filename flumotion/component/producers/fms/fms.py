@@ -38,6 +38,11 @@ sound_format_has_headers = {SOUND_FORMAT_AAC: True}
 codec_id_has_headers = {CODEC_ID_H264: True}
 
 
+#TODO: Factor out the application logic from the part that actually handles the
+# flv chunks and does all the processing. Right now the application is at the
+# same time the subscriber.
+
+
 class FMSApplication(server.Application, log.Loggable):
 
     logCategory = 'fms-app'
@@ -155,7 +160,9 @@ class FMSApplication(server.Application, log.Loggable):
                                 "stream not yet published")
             return
 
-        self._stream.removeSubscriber(self)
+        # Do we need this? the subscribers are removed just after the unpublish
+        # is done.
+        # self.removeSubscriber(self._stream, self)
         self._stream = None
         self._syncTimestamp = -1
         self._syncOffset = -1
