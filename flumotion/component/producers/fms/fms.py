@@ -13,7 +13,6 @@
 # Headers in this file shall remain intact.
 
 import gst
-import struct
 from StringIO import StringIO
 
 from flvlib import tags
@@ -557,18 +556,12 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
     logCategory = 'fms'
     DEFAULT_PORT = 1935
     DEFAULT_MOUNT = '/live/stream.flv'
-    MONITORING_FREQUENCY = 5.0
 
     def init(self):
         self._port = None
         self._appName = None
         self._streamName = None
         self._source = None
-
-        # For monitorization
-        self._bufferCount = 0
-        self._monitoringCall = None
-
         self.starving = False
 
     def get_pipeline_string(self, properties):
@@ -576,6 +569,9 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
 
     def configure_pipeline(self, pipeline, properties):
         self._source = self.pipeline.get_by_name("source")
+        self._pad_monitors.attach(self._source.get_pad('src'), 'fms-src')
+        self._pad_monitors['fms-src'].addWatch(self._i_am_being_feed,
+                                               self._i_am_starving)
 
     def check_properties(self, properties, addMessage):
 
@@ -603,8 +599,6 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         app = FMSApplication(self, self._streamName)
         factory = server.ServerFactory({self._appName: app})
 
-        self._scheduleMonitoring()
-
         try:
             self.debug('Listening on TCP port %d' % self._port)
             reactor.listenTCP(self._port, factory)
@@ -617,9 +611,6 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
             self.setMood(moods.sad)
             return defer.fail(errors.ComponentStartHandledError(t))
 
-    def do_stop(self):
-        self._cancelMonitoring()
-
     def appError(self, msg, debug=None):
         self.warning(msg)
         self.addMessage(Error(T_(N_(msg)), debug=debug))
@@ -629,33 +620,18 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         self._source.get_pad('src').set_caps(caps)
 
     def pushStreamBuffer(self, buffer):
-        self._bufferCount += 1
         self._source.emit('push-buffer', buffer)
 
     def sendEvent(self, event):
         self.log('Sending flumotion-reset event downstream')
         self._source.get_pad('src').get_peer().send_event(event)
 
-    def _scheduleMonitoring(self):
-        dc = reactor.callLater(self.MONITORING_FREQUENCY, self._doMonitoring)
-        self._monitoringCall = dc
+    def _i_am_starving(self, name):
+        if not self.starving:
+            self.debug("Not receiving RTMP data from encoder.")
+            self.starving = True
 
-    def _cancelMonitoring(self):
-        if self._monitoringCall is not None:
-            self._monitoringCall.cancel()
-            self._monitoringCall = None
-
-    def _doMonitoring(self):
-        if self._bufferCount == 0:
-            if not self.starving:
-                self.debug("No RTMP data received since %0.2f seconds, "
-                           "we are starving", self.MONITORING_FREQUENCY)
-                self.setMood(moods.hungry)
-                self.starving = True
-        else:
-            if self.starving:
-                self.debug("RTMP data received, we are not starving anymore")
-                self.setMood(moods.happy)
-                self.starving = False
-            self._bufferCount = 0
-        self._scheduleMonitoring()
+    def _i_am_being_feed(self, name):
+        if self.starving:
+            self.debug("RTMP data received, we are not starving anymore")
+            self.starving = False

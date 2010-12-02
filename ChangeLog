@@ -1,3 +1,11 @@
+2010-12-02  Xavier Queralt  <xqueralt@flumotion.com>
+
+	reviewed by: jribas
+
+	* flumotion/component/producers/fms/fms.py:
+	Instead of monitorizing the buffers we receive via a callLater we
+	can use the pad monitors we already have in the components.
+
 2010-11-15  Xavier Queralt  <xqueralt@flumotion.com>
 
 	reviewed by: jribas
