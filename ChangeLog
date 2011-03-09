@@ -1,3 +1,13 @@
+2011-03-09  Xavier Queralt  <xqueralt@flumotion.com>
+
+	* flumotion/component/producers/fms/fms.py:
+	Remove startcodes from the incoming H.264 packets.
+	When pushing from a Digital Rapids encoder we get:
+	  - access unit delimiter in each packet
+	  - SPS and PPS embeded each 2 seconds
+	This breaks the decoder so we don't want it!
+	See https://code.area51.fluendo.com/private/trac/ticket/14915#comment:7
+
 2010-12-02  Xavier Queralt  <xqueralt@flumotion.com>
 
 	reviewed by: jribas

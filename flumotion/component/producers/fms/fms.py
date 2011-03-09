@@ -41,6 +41,12 @@ codec_id_has_headers = {CODEC_ID_H264: True}
 # flv chunks and does all the processing. Right now the application is at the
 # same time the subscriber.
 
+STARTCODE = "\x00\x00\x00\x01"
+
+NAL_UNIT_TYPE_SPS = 7
+NAL_UNIT_TYPE_PPS = 8
+NAL_UNIT_TYPE_AUD = 9
+
 
 class FMSApplication(server.Application, log.Loggable):
 
@@ -92,6 +98,9 @@ class FMSApplication(server.Application, log.Loggable):
 
         self._backlog = []
         self._headers = []
+
+        self._sps_len = 0
+        self._pps_len = 0
 
     def onPublish(self, client, stream):
         peer = client.nc.transport.getPeer()
@@ -329,6 +338,52 @@ class FMSApplication(server.Application, log.Loggable):
         self.log("Got video buffer with timestamp %d", time)
         self.buildAndPushVideoBuffer(data, time, tag)
 
+    def _parseHeader(self, data):
+        self._sps_len = (ord(data[11])<<8) | ord(data[12])
+        pps_pos = 14 + self._sps_len
+        self._pps_len = (ord(data[pps_pos])<<8) | ord(data[pps_pos+1])
+        self.debug("Got SPS of %d bytes and PPS of %d bytes", self._sps_len, self._pps_len)
+
+
+    def _removeStarCodes(self, data):
+        to_remove = 0
+        remove_from = 0
+        start = 5
+
+        index = data.find(STARTCODE, start, 70)
+        while index > 0:
+            self.debug("Found an start code inside an AVC packet at %d", index)
+
+            if remove_from == 0:
+                remove_from = index
+            to_remove += len(STARTCODE)
+
+            nal_unit_type = ord(data[index+len(STARTCODE)]) & 0x0F
+            if nal_unit_type == NAL_UNIT_TYPE_AUD:
+                self.debug("Found Access unit delimitier in stream. Dropping it")
+                to_remove += 2
+                start += len(STARTCODE) + 2
+            if nal_unit_type == NAL_UNIT_TYPE_SPS:
+                self.debug("Found SPS in stream. Dropping it")
+                to_remove += self._sps_len
+                start += len(STARTCODE) + self._sps_len
+            elif nal_unit_type == NAL_UNIT_TYPE_PPS:
+                self.debug("Found PPS in stream. Dropping it")
+                to_remove += self._pps_len
+                start += self._pps_len
+            index = data.find(STARTCODE, start, 70)
+
+        if to_remove:
+            to_remove += 3
+            dataio = StringIO(data[:remove_from] + data[remove_from+to_remove:])
+            total_bytes = (ord(data[7])<<8) | ord(data[8])
+            total_bytes -= to_remove
+            dataio.seek(7)
+            dataio.write(chr(total_bytes >> 8))
+            dataio.write(chr(total_bytes & 0xFF))
+            data = dataio.getvalue()
+        return data
+
     def buildAndPushVideoBuffer(self, data, time, tag):
         if tag.h264_packet_type == H264_PACKET_TYPE_END_OF_SEQUENCE:
             # the timestamp of this buffer is not continious and is sent
@@ -343,10 +398,14 @@ class FMSApplication(server.Application, log.Loggable):
                 'with adjusted time %d ms', time, fixedTime)
             self._firstVideoSent = True
 
+        if tag.h264_packet_type is not None:
+            data = self._removeStarCodes(data)
+
         flvTag = tags.create_flv_tag(TAG_TYPE_VIDEO, data, fixedTime)
         
         if tag.h264_packet_type == H264_PACKET_TYPE_SEQUENCE_HEADER:
             assert self._needVideoHeader, "Video header not expected"
+            self._parseHeader(data)
             if self._gotVideoHeader:
                 # FMLE might send the sequence header before the new metadata
                 # which screws us up. We keep the tag instead of dropping it
@@ -535,6 +594,9 @@ class FMSApplication(server.Application, log.Loggable):
         self._syncOffset = -1
 
         self._headers = []
+
+        self._sps_len = 0
+        self._pps_len = 0
 
     def _buildHeaderBuffer(self, data, with_in_caps=True):
         buff = gst.Buffer(data)
