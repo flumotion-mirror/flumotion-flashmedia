@@ -1,6 +1,14 @@
 2011-03-09  Xavier Queralt  <xqueralt@flumotion.com>
 
 	* flumotion/component/producers/fms/fms.py:
+	With the new GStreamer we don't need to set the caps of the appsrc.
+	Actually, if we do, the next component receives the streamheader twice
+	and can commit suicide if he doesn't like receiving two headers
+	(e.g. decoder). See #15261
+
+2011-03-09  Xavier Queralt  <xqueralt@flumotion.com>
+
+	* flumotion/component/producers/fms/fms.py:
 	Remove startcodes from the incoming H.264 packets.
 	When pushing from a Digital Rapids encoder we get:
 	  - access unit delimiter in each packet

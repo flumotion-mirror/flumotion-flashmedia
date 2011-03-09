@@ -678,7 +678,6 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         self.addMessage(Error(T_(N_(msg)), debug=debug))
 
     def setStreamCaps(self, caps):
-        self._source.props.caps = caps
         self._source.get_pad('src').set_caps(caps)
 
     def pushStreamBuffer(self, buffer):
