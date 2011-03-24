@@ -3,6 +3,16 @@
 	reviewed by: Xavier Queralt
 
 	* flumotion/component/producers/fms/fms.py:
+	Discard requests to clear metadata.
+	We take care of clearing metadata when we receive changes in the
+	metadata. There is no need for us to it to clear it in the
+	@clearDataFrame handler.
+
+2011-03-24  Josep Joan Ribas  <jribas@flumotion.com>
+
+	reviewed by: Xavier Queralt
+
+	* flumotion/component/producers/fms/fms.py:
 	Allow receiving audio stream headers before metadata.
 	When the audio tag containing the sequence header comes before
 	the new metadata and the codec didn't change we have to keep the

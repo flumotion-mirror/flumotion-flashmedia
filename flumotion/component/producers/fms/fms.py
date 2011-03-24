@@ -192,6 +192,11 @@ class FMSApplication(server.Application, log.Loggable):
     def onMetaData(self, data):
         self.debug("Meta-data: %r", data)
 
+       if not data:
+            self.debug("We have been asked to clear metadata, we will do it as "
+                       "soon as we get new metadata")
+            return
+
         if not self._published:
             self._internalError('Meta-data received for an unpublished stream')
             return
