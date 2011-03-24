@@ -274,11 +274,20 @@ class FMSApplication(server.Application, log.Loggable):
 
         if tag.aac_packet_type == AAC_PACKET_TYPE_SEQUENCE_HEADER:
             assert self._needAudioHeader, "Audio header not expected"
-            self.debug("Audio stream sequence header received")
-            self._addHeader(flvTag)
-            self._gotAudioHeader = True
-            self._tryStarting()
-            return
+            if self._gotAudioHeader:
+                # FMLE might send the sequence header before the new metadata
+                # which screws us up. We keep the tag instead of dropping it
+                # so we can send it latter when the changes are detected.
+                self._backupAudioHeader = flvTag
+                self.debug("Keeping audio sequence header, just in case the "
+                           "new metadata didn't come yet")
+                return
+            else:
+                self.debug("Audio stream sequence header received")
+                self._addHeader(flvTag)
+                self._gotAudioHeader = True
+                self._tryStarting()
+                return
         elif self._needAudioHeader and self._backupAudioHeader:
             # There have been changes and we are waiting for a header tag but
             # what we got is a normal audio tag. It came earlier than expected

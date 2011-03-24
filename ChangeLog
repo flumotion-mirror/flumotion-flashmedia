@@ -1,3 +1,13 @@
+2011-03-24  Josep Joan Ribas  <jribas@flumotion.com>
+
+	reviewed by: Xavier Queralt
+
+	* flumotion/component/producers/fms/fms.py:
+	Allow receiving audio stream headers before metadata.
+	When the audio tag containing the sequence header comes before
+	the new metadata and the codec didn't change we have to keep the
+	header and send it later.
+
 2011-03-09  Xavier Queralt  <xqueralt@flumotion.com>
 
 	* flumotion/component/producers/fms/fms.py:
