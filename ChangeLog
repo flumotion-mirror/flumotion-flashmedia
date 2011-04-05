@@ -1,3 +1,13 @@
+2011-04-05  Xavier Queralt  <xqueralt@flumotion.com>
+
+	* README:
+	* flumotion/component/producers/fms/Makefile.am:
+	* flumotion/component/producers/fms/admin_gtk.py:
+	* flumotion/component/producers/fms/fms.glade:
+	* flumotion/component/producers/fms/fms.py:
+	* flumotion/component/producers/fms/fms.xml:
+	Added two tabs to better debug the input connections to fms producer.
+
 2011-03-24  Josep Joan Ribas  <jribas@flumotion.com>
 
 	reviewed by: Xavier Queralt

@@ -7,6 +7,8 @@
       <feeder name="default"/>
 
       <entries>
+        <entry type="admin/gtk" location="admin_gtk.py"
+               function="GUIClass"/>
         <entry type="component" location="fms.py"
                function="FlashMediaServer"/>
       </entries>
@@ -21,17 +23,42 @@
   </components>
 
   <bundles>
-
-    <bundle project="flashmedia" name="flash-media-server-producer-component">
+    <bundle project="flashmedia" name="fms-base">
         <dependencies>
-            <dependency name="component" />
+            <dependency name="component-base" />
         </dependencies>
 
         <directories>
             <directory name="flumotion/component/producers/fms">
                 <filename location="__init__.py" />
+            </directory>
+        </directories>
+    </bundle>
+
+    <bundle project="flashmedia" name="fms-component">
+        <dependencies>
+            <dependency name="component" />
+            <dependency name="fms-base" />
+        </dependencies>
+
+        <directories>
+            <directory name="flumotion/component/producers/fms">
                 <filename location="fms.py" />
                 <filename location="live.py" />
+            </directory>
+        </directories>
+    </bundle>
+
+    <bundle project="flashmedia" name="fms-admin-gtk">
+        <dependencies>
+            <dependency name="fms-base" />
+            <dependency name="base-admin-gtk" />
+        </dependencies>
+
+        <directories>
+            <directory name="flumotion/component/producers/fms">
+                <filename location="admin_gtk.py" />
+                <filename location="fms.glade" />
             </directory>
         </directories>
     </bundle>
