@@ -732,7 +732,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         return 8 * float(size) / elapsed_time
 
     def _update_ui_state(self):
-        self.info('Update uistate')
+        self.log('Update uistate')
         audio_bps = video_bps = 0
         if self._sizes['audio']:
             audio_bps = self._calculate_bandwidth(self._sizes['audio'].keys(),
@@ -741,7 +741,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
             video_bps = self._calculate_bandwidth(self._sizes['video'].keys(),
                                                   self._sizes['video'].values())
 
-        self.info('Update bandwidth: A:%r V:%r', audio_bps, video_bps)
+        self.log('Update bandwidth: A:%r V:%r', audio_bps, video_bps)
         bw = (audio_bps and video_bps and [video_bps, audio_bps]
               or video_bps and [video_bps]
               or audio_bps and [audio_bps])
@@ -756,7 +756,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         sizes[time.time()] = len(data)
         times = sizes.keys()
 
-        self.info('Update %s sizes %r, %r', mtype, times[-1], times[0])
+        self.log('Update %s sizes %r, %r', mtype, times[-1], times[0])
 
         if times[-1] - times[0] > UI_UPDATE_THROTTLE_PERIOD:
             del sizes[times[0]]

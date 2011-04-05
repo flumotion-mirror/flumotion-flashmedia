@@ -1,5 +1,10 @@
 2011-04-05  Xavier Queralt  <xqueralt@flumotion.com>
 
+	* flumotion/component/producers/fms/fms.py:
+	Lower log level of some messages
+
+2011-04-05  Xavier Queralt  <xqueralt@flumotion.com>
+
 	* README:
 	* flumotion/component/producers/fms/Makefile.am:
 	* flumotion/component/producers/fms/admin_gtk.py:
