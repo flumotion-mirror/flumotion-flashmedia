@@ -208,7 +208,7 @@ class FMSApplication(server.Application, log.Loggable):
         self.debug("Meta-data: %r, %s", data, type(data))
         #self._component.update_sizes(data)
 
-       if not data:
+        if not data:
             self.debug("We have been asked to clear metadata, we will do it as "
                        "soon as we get new metadata")
             return
