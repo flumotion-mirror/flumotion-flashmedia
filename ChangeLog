@@ -1,3 +1,9 @@
+2011-04-05  Theodoros Paschidis <tpaschidis@flumotion.com>
+
+	* flumotion/component/producers/fms/fms.py:
+	Fixed the case where we get into an infinite loop in case we recieve
+	a start code of unknown nal_unit_type.
+
 2011-04-05  Xavier Queralt  <xqueralt@flumotion.com>
 
 	* flumotion/component/producers/fms/fms.py:
@@ -93,7 +99,7 @@
 
 2010-09-30  Andoni Morales Alastruey  <amorales@flumotion.com>
 
-	reviewed by: Sebastien Merle 
+	reviewed by: Sebastien Merle
 	* flumotion/component/producers/fms/fms.py:
 	Fix re-timestamping and synchronisation.
 
@@ -111,12 +117,12 @@
 	Example:
 	We received the last buffer with ts=10000. After the reconnection
 	buffer1 has ts=100 and buffer2 has ts=140. We set syncTS=10000+x (where x
-	is set to 40ms because a gap is needed from the last timestamp) and 
+	is set to 40ms because a gap is needed from the last timestamp) and
 	syncOffset=100
 	We get after fixing the timestamps:
 	buffer1 -> ts=10040
 	buffer2 -> ts=10080
-		
+
 
 2010-09-29  Thomas Vander Stichele  <thomas at apestaart dot org>
 

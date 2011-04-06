@@ -388,7 +388,7 @@ class FMSApplication(server.Application, log.Loggable):
 
         index = data.find(STARTCODE, start, 70)
         while index > 0:
-            self.debug("Found an start code inside an AVC packet at %d", index)
+            self.debug("Found a start code inside an AVC packet at %d", index)
 
             if remove_from == 0:
                 remove_from = index
@@ -407,6 +407,9 @@ class FMSApplication(server.Application, log.Loggable):
                 self.debug("Found PPS in stream. Dropping it")
                 to_remove += self._pps_len
                 start += self._pps_len
+            else:
+                # In case of an unknown NAL_UNIT_TYPE
+                return data
             index = data.find(STARTCODE, start, 70)
 
         if to_remove:
@@ -438,7 +441,7 @@ class FMSApplication(server.Application, log.Loggable):
             data = self._removeStarCodes(data)
 
         flvTag = tags.create_flv_tag(TAG_TYPE_VIDEO, data, fixedTime)
-        
+
         if tag.h264_packet_type == H264_PACKET_TYPE_SEQUENCE_HEADER:
             assert self._needVideoHeader, "Video header not expected"
             self._parseHeader(data)
@@ -491,7 +494,7 @@ class FMSApplication(server.Application, log.Loggable):
             self.debug("Adding new sync point at %s" % self._totalTime)
             # we want to re-timestamp from the timestamp of the last buffer
             # pushed, but not the same exact time. that's why we to the sync
-            # point 40ms 
+            # point 40ms
             self._syncTimestamp = self._totalTime + 40
             self._syncOffset = timestamp
 
@@ -589,7 +592,7 @@ class FMSApplication(server.Application, log.Loggable):
         caps = gst.caps_from_string("video/x-flv")
         caps[0]['streamheader'] = (buffer,) + tuple(self._headers)
         self._component.setStreamCaps(caps)
-        
+
         self.debug("RESET: send event downstream")
         self._component.sendEvent(gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM,
                                                        gst.Structure('flumotion-reset')))
