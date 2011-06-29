@@ -1,3 +1,8 @@
+2011-06-29  Xavier Queralt  <xqueralt@gmail.com>
+
+	* flumotion/component/producers/fms/fms.py:
+	There is no need of sending flumotion-reset anymore!
+
 2011-04-06  Theodoros Paschidis <tpaschidis@flumotion.com>
 
 	* flumotion/component/producers/fms/fms.py:

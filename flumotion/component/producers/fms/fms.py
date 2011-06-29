@@ -516,11 +516,6 @@ class FMSApplication(server.Application, log.Loggable):
     def _addHeader(self, data):
         buffer = self._buildHeaderBuffer(data)
         self._headers.append(buffer)
-        if self._changed:
-            # When changes arrive we want to send the new headers without the
-            # IN_CAPS flag so the buffers are not dropped because of the change
-            # This way the stream is valid and playable for any flash player.
-            self._pushStreamBuffer(self._buildHeaderBuffer(data, False))
 
     def _pushStreamBuffer(self, buffer):
         if self._started:
@@ -592,10 +587,6 @@ class FMSApplication(server.Application, log.Loggable):
         caps = gst.caps_from_string("video/x-flv")
         caps[0]['streamheader'] = (buffer,) + tuple(self._headers)
         self._component.setStreamCaps(caps)
-
-        self.debug("RESET: send event downstream")
-        self._component.sendEvent(gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM,
-                                                       gst.Structure('flumotion-reset')))
 
         if self._backlog:
             self.debug("Flushing backlog of %d buffers", len(self._backlog))
@@ -814,10 +805,6 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
 
     def pushStreamBuffer(self, buffer):
         self._source.emit('push-buffer', buffer)
-
-    def sendEvent(self, event):
-        self.log('Sending flumotion-reset event downstream')
-        self._source.get_pad('src').get_peer().send_event(event)
 
     def _i_am_starving(self, name):
         if not self.starving:
