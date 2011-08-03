@@ -14,6 +14,7 @@
 
 import gst
 import time
+import socket
 from StringIO import StringIO
 
 from flvlib import tags
@@ -22,6 +23,7 @@ from flvlib.constants import *
 from rtmpy import server, exc
 
 from twisted.internet import reactor, error, defer
+from twisted.internet.task import LoopingCall
 from twisted.python import util
 
 from flumotion.common import log, errors
@@ -111,8 +113,7 @@ class FMSApplication(server.Application, log.Loggable):
         peer = client.nc.transport.getPeer()
         self.info("Client %s:%d publishing stream %s", peer.host, peer.port,
             stream.name)
-        self._component.new_client_event(peer.host, peer.port,
-                                         "start publish", time.strftime("%c"))
+        self._component.new_client_event(peer.host, peer.port, "start publish")
         # If we failed we just refuse everything
         if self._failed:
             return False
@@ -160,8 +161,7 @@ class FMSApplication(server.Application, log.Loggable):
     def onConnect(self, client, **args):
         peer = client.nc.transport.getPeer()
         self.info("Client %s:%d connected", peer.host, peer.port)
-        self._component.new_client_event(peer.host, peer.port,
-                                         "connected", time.strftime("%c"))
+        self._component.new_client_event(peer.host, peer.port, "connected")
         return server.Application.onConnect(self, client)
 
     def onDisconnect(self, client):
@@ -170,8 +170,7 @@ class FMSApplication(server.Application, log.Loggable):
         server.Application.onDisconnect(self, client)
         if client == self._client:
             self._client = None
-        self._component.new_client_event(peer.host, peer.port,
-                                         "disconnected", time.strftime("%c", ))
+        self._component.new_client_event(peer.host, peer.port, "disconnected")
 
     def streamPublished(self):
         self.debug("Stream %s published", self._streamName)
@@ -181,8 +180,7 @@ class FMSApplication(server.Application, log.Loggable):
         self._published = True
 
         peer = self._client.nc.transport.getPeer()
-        self._component.new_client_event(peer.host, peer.port,
-                                         "published", time.strftime("%c", ))
+        self._component.new_client_event(peer.host, peer.port, "published")
 
     def streamUnpublished(self):
         self.debug("Stream %s unpublished", self._streamName)
@@ -201,12 +199,11 @@ class FMSApplication(server.Application, log.Loggable):
         self._published = False
 
         peer = self._client.nc.transport.getPeer()
-        self._component.new_client_event(peer.host, peer.port,
-                                         "unpublished", time.strftime("%c"))
+        self._component.new_client_event(peer.host, peer.port, "unpublished")
 
     def onMetaData(self, data):
         self.debug("Meta-data: %r, %s", data, type(data))
-        #self._component.update_sizes(data)
+        self._component.clear_sizes()
 
         if not data:
             self.debug("We have been asked to clear metadata, we will do it as "
@@ -253,13 +250,11 @@ class FMSApplication(server.Application, log.Loggable):
             self._tryStarting()
 
     def audioDataReceived(self, data, time):
-        self._component.update_sizes("audio", data)
+        self._component.update_sizes("audio", data, time)
         if not self._firstAudioReceived:
             self.info('Received first audio buffer with timestamp %d ms',
                 time)
             self._firstAudioReceived = True
-
-        self.log("Audio frame: %d ms, %d bytes", time, len(data))
 
         if not self._published:
             self._internalError('Audio frame received for an unpublished stream')
@@ -333,13 +328,11 @@ class FMSApplication(server.Application, log.Loggable):
         self._pushStreamBuffer(buffer)
 
     def videoDataReceived(self, data, time):
-        self._component.update_sizes("video", data)
+        self._component.update_sizes("video", data, time)
         if not self._firstVideoReceived:
             self.info('Received first video buffer with timestamp %d ms',
                 time)
             self._firstVideoReceived = True
-
-        self.log("Video frame: %d ms, %d bytes", time, len(data))
 
         if not self._published:
             self._internalError('Video frame received for an unpublished stream')
@@ -355,7 +348,7 @@ class FMSApplication(server.Application, log.Loggable):
         # Set it to a dummy value just to prevent TypeError.
         tag.size = 0
         tag.parse_tag_content()
-
+        
         info = {'codec': tag.codec_id}
 
         if self._videoinfo and self._videoinfo != info:
@@ -371,7 +364,6 @@ class FMSApplication(server.Application, log.Loggable):
             self._needVideoHeader = nh
             self._gotVideoHeader = False
 
-        self.log("Got video buffer with timestamp %d", time)
         self.buildAndPushVideoBuffer(data, time, tag)
 
     def _parseHeader(self, data):
@@ -658,16 +650,17 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
 
         self._sizes = {'audio': util.OrderedDict(),
                        'video': util.OrderedDict()}
-        self._update_uistate_id = None
+
+        self._update_task = None
 
         self.uiState.addDictKey('metadata')
         self.uiState.addDictKey('codec-info')
 
         self.uiState.addListKey('upload-bw', [0])
+        self.uiState.addListKey('upload-fps', 0)
         self.uiState.addListKey('encoder-host', [])
         self.uiState.addKey('total-connections', 0)
         self.uiState.addKey('last-connect', 0)              # last client connect, epoch
-        self.uiState.addKey('last-disconnect', time.time()) # last client disconnect, epoch
 
         self.uiState.addListKey('client-events', [])
 
@@ -721,58 +714,81 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
 
     def _calculate_bandwidth(self, times, sizes):
         size = sum(sizes)
-        elapsed_time = times[-1] - times[0]
+        elapsed_time = (times[-1] - times[0]) / 1000.0
+        if not elapsed_time:
+            return 0.0
 
         return 8 * float(size) / elapsed_time
 
+    def _calculate_fps(self, times):
+        frames = len(times)
+        elapsed_time = (times[-1] - times[0]) / 1000.0
+        if not elapsed_time:
+            return 0.0
+
+        return float(frames) / elapsed_time
+
     def _update_ui_state(self):
-        self.log('Update uistate')
-        audio_bps = video_bps = 0
-        if self._sizes['audio']:
-            audio_bps = self._calculate_bandwidth(self._sizes['audio'].keys(),
-                                                  self._sizes['audio'].values())
+        bandwidths = []
+        video_fps = 0.0
+
         if self._sizes['video']:
             video_bps = self._calculate_bandwidth(self._sizes['video'].keys(),
                                                   self._sizes['video'].values())
+            bandwidths.append(video_bps)
+            video_fps = self._calculate_fps(self._sizes['video'].keys())
 
-        self.log('Update bandwidth: A:%r V:%r', audio_bps, video_bps)
-        bw = (audio_bps and video_bps and [video_bps, audio_bps]
-              or video_bps and [video_bps]
-              or audio_bps and [audio_bps])
+        if self._sizes['audio']:
+            audio_bps = self._calculate_bandwidth(self._sizes['audio'].keys(),
+                                                  self._sizes['audio'].values())
 
-        self.uiState.set('upload-bw', bw)
+            bandwidths.append(audio_bps)
 
-        self._update_uistate_id = None
+        self.log('Update bandwidth: %s bps', ", ".join(map(str, bandwidths)))
+        self.log('Buffers kept A: %d V: %d', len(self._sizes['audio']),
+                 len(self._sizes['video']))
 
+        self.uiState.set('upload-bw', bandwidths)
+        self.uiState.set('upload-fps', video_fps)
 
-    def update_sizes(self, mtype, data):
+    def clear_sizes(self):
+        self._sizes['video'] = util.OrderedDict()
+        self._sizes['audio'] = util.OrderedDict()
+
+    def update_sizes(self, mtype, data, time):
         sizes = self._sizes[mtype]
-        sizes[time.time()] = len(data)
+        sizes[time] = len(data)
         times = sizes.keys()
 
-        self.log('Update %s sizes %r, %r', mtype, times[-1], times[0])
+        if len(times) < 2:
+            return
 
-        if times[-1] - times[0] > UI_UPDATE_THROTTLE_PERIOD:
+        if times[-1] - times[0] > UI_UPDATE_THROTTLE_PERIOD * 1000:
             del sizes[times[0]]
-            if not self._update_uistate_id:
-                self._update_uistate_id = \
-                reactor.callLater(UI_UPDATE_THROTTLE_PERIOD,
-                                  self._update_ui_state)
+            if not self._update_task:
+                self._update_task = LoopingCall(self._update_ui_state)
+                self._update_task.start(UI_UPDATE_THROTTLE_PERIOD,  now=True)
 
-    def new_client_event(self, host, port, event, timestamp):
+    def new_client_event(self, host, port, event):
         if event == 'connected':
             self.uiState.set('total-connections',
                              self.uiState.get('total-connections', 0) + 1)
-
             self.uiState.set('last-connect', time.time())
-            self.uiState.addKey('last-disconnect', 0) # last client disconnect, epoch
-            self.uiState.set('encoder-host', [host, port])
-        elif event == 'disconnected':
-            self.uiState.set('last-disconnect', time.time())
-            self.uiState.addKey('last-connect', 0) # last client disconnect, epoch
+        elif event == 'published':
+            try:
+                hostname = socket.gethostbyaddr(host)[0]
+            except:
+                hostname = ''
+
+            self.uiState.set('encoder-host', [host, hostname, port])
+        elif event == 'unpublished':
+            self._update_task.stop()
+            self._update_task = None
+            self.uiState.set('upload-bw', [0])
+            self.uiState.set('upload-fps', 0.0)
 
         event = {"ip": host, "port": port,
-                  "event": event, "timestamp": timestamp}
+                  "event": event, "timestamp": time.time()}
 
         events = self.uiState.get('client-events')
 
@@ -809,7 +825,6 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
     def _i_am_starving(self, name):
         if not self.starving:
             self.debug("Not receiving RTMP data from encoder.")
-            self.uiState.set('upload-bw', [0])
             self.starving = True
 
     def _i_am_being_feed(self, name):

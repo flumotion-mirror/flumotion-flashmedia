@@ -29,7 +29,7 @@ from kiwi.ui.objectlist import Column
 from kiwi.python import Settable
 from twisted.internet import task
 
-from flumotion.common.format import formatStorage, formatTime
+from flumotion.common.formatting import formatStorage, formatTime
 from flumotion.component.base.admin_gtk import BaseAdminGtk
 from flumotion.component.base.baseadminnode import BaseAdminGtkNode
 
@@ -188,8 +188,8 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
             'label-connection-time',
             'label-bandwidth-description',
             'label-bandwidth',
-            'label-disconnection-description',
-            'label-disconnection-time',
+            'label-fps',
+            'label-fps-description',
             'label-encoder-ip',
             'label-encoder-port',
             'label-encoder-mountpoint',
@@ -200,11 +200,15 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
 
         self.widgets['label-encoder-mountpoint'].set_text(properties.get('mount-point',
                                                                          '/live/stream.flv'))
+
+        def format_time(timestamp):
+            return time.strftime("%x %X", time.localtime(timestamp))
+
         self.widgets['connections'].set_columns(
-            [Column("ip", title=_("Encoder"), searchable=True),
-             Column("timestamp", title=_("Timestamp"), sorted=True,
+            [Column("timestamp", title=_("Timestamp"), sorted=True,
                     ellipsize=pango.ELLIPSIZE_START, expand=True,
-                    order=gtk.SORT_DESCENDING),
+                    order=gtk.SORT_DESCENDING, format_func=format_time),
+             Column("ip", title=_("Encoder"), searchable=True),
              Column("event", title=_("Event")),
             ])
 
@@ -219,10 +223,10 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
         if not self.uiStateHandlers:
             self.uiStateHandlers = {
                 'upload-bw':         self.uploadBandwidthSet,
+                'upload-fps':        self.uploadFPSSet,
                 'total-connections': self.totalConnectionsSet,
                 'encoder-host':      self.encoderHostSet,
                 'last-connect':      self.lastConnectSet,
-                'last-disconnect':   self.lastDisconnectSet,
                 'client-events':    self.clientEventsSet,
             }
 
@@ -239,6 +243,15 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
         if handler:
             handler(value)
 
+    def uploadFPSSet(self, fps):
+        if not fps:
+            self.widgets['label-fps'].hide()
+            self.widgets['label-fps-description'].hide()
+        else:
+            self.widgets['label-fps'].show()
+            self.widgets['label-fps-description'].show()
+            self.widgets['label-fps'].set_text("%.2f fps" % fps)
+
     def uploadBandwidthSet(self, bw):
         if len(bw) == 1:
             self.widgets['label-bandwidth'].set_text(formatStorage(bw[0]) + _("bit/s"))
@@ -253,50 +266,23 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
         self.widgets['label-total-connections'].set_text("%d" % count)
 
     def encoderHostSet(self, host):
-        if len(host) == 2:
-            self.widgets['label-encoder-ip'].set_text("%s" % host[0])
-            self.widgets['label-encoder-port'].set_text("%s" % host[1])
+        if len(host) == 3:
+            hostname_str = host[1] != '' and "%s (%s)" % (host[1], host[0]) or host[0]
+            self.widgets['label-encoder-ip'].set_text(hostname_str)
+            self.widgets['label-encoder-port'].set_text("%s" % host[2])
 
     def lastConnectSet(self, last):
         w = self.widgets
-        if last:
-            w['label-connection-description'].show()
-            w['label-connection-time'].show()
-            w['label-bandwidth-description'].show()
-            w['label-bandwidth'].show()
-            w['label-connection-time'].show()
-
-            if self.timer_counter:
-                self.timer_counter.stop()
-            self.timer_counter = \
-                    task.LoopingCall(self._set_connection_time,
-                                     w['label-connection-time'], last)
-            self.timer_counter.start(60)
-        else:
-            w['label-connection-description'].hide()
-            w['label-connection-time'].hide()
-            w['label-bandwidth-description'].hide()
-            w['label-bandwidth'].hide()
-
-    def lastDisconnectSet(self, last):
-        w = self.widgets
-        if last:
-            w['label-disconnection-description'].show()
-            w['label-disconnection-time'].show()
-            if self.timer_counter:
-                self.timer_counter.stop()
-            self.timer_counter = \
-                    task.LoopingCall(self._set_connection_time,
-                                     w['label-disconnection-time'], last)
-            self.timer_counter.start(60)
-        else:
-            w['label-disconnection-description'].hide()
-            w['label-disconnection-time'].hide()
+        if self.timer_counter:
+            self.timer_counter.stop()
+        self.timer_counter = \
+                task.LoopingCall(self._set_connection_time,
+                                w['label-connection-time'], last)
+        self.timer_counter.start(60)
 
     def _set_connection_time(self, label, ctime):
         text = formatTime(time.time() - ctime)
         label.set_text(text)
-
 
     def clientEventsSet(self, events):
         if not isinstance(events, list):
