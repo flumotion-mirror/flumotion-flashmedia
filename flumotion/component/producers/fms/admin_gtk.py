@@ -253,14 +253,18 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
             self.widgets['label-fps'].set_text("%.2f fps" % fps)
 
     def uploadBandwidthSet(self, bw):
-        if len(bw) == 1:
-            self.widgets['label-bandwidth'].set_text(formatStorage(bw[0]) + _("bit/s"))
-        elif len(bw) == 2:
+        audio_bw = bw["audio"]
+        video_bw = bw["video"]
+        total = video_bw + audio_bw
+
+        if not video_bw or not audio_bw:
+            self.widgets['label-bandwidth'].set_text(formatStorage(total) + _("bit/s"))
+        else:
             self.widgets['label-bandwidth'].set_text(
                 "Video, %s\nAudio, %s\nTotal,  %s" %(
-                    formatStorage(bw[0]) + _("bit/s"),
-                    formatStorage(bw[1]) + _("bit/s"),
-                    formatStorage(sum(bw)) + _("bit/s")))
+                    formatStorage(video_bw) + _("bit/s"),
+                    formatStorage(audio_bw) + _("bit/s"),
+                    formatStorage(total) + _("bit/s")))
 
     def totalConnectionsSet(self, count):
         self.widgets['label-total-connections'].set_text("%d" % count)

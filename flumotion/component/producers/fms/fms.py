@@ -28,7 +28,7 @@ from twisted.python import util
 
 from flumotion.common import log, errors
 from flumotion.common.i18n import gettexter, N_
-from flumotion.common.messages import Error
+from flumotion.common import messages
 from flumotion.component import feedcomponent
 from flumotion.component.component import moods
 
@@ -113,7 +113,6 @@ class FMSApplication(server.Application, log.Loggable):
         peer = client.nc.transport.getPeer()
         self.info("Client %s:%d publishing stream %s", peer.host, peer.port,
             stream.name)
-        self._component.new_client_event(peer.host, peer.port, "start publish")
         # If we failed we just refuse everything
         if self._failed:
             return False
@@ -127,9 +126,11 @@ class FMSApplication(server.Application, log.Loggable):
         """ Called while publishing the stream. Here we can decide
         wether the stream can be published or not for that client.
         """
+        peer = client.nc.transport.getPeer()
         if name != self._streamName:
             self.debug("Stream %s refused: stream name should be %s",
                        name, self._streamName)
+            self._component.new_client_event("badname", peer.host, peer.port, name)
             raise exc.BadNameError('%s is not a valid name' % (name,))
 
         # Check if we have already a client publishing
@@ -141,6 +142,7 @@ class FMSApplication(server.Application, log.Loggable):
                 # refuse the publish request
                 self.debug("...and it is still publishing. Sorry, but we have "
                            "to refuse this request")
+                self._component.new_client_event("ispublished", peer.host, peer.port)
                 raise exc.BadNameError('%s is already published!' % (name,))
             else:
                 self.debug("The other client is slacking or is lost: disconnecting and "
@@ -161,7 +163,7 @@ class FMSApplication(server.Application, log.Loggable):
     def onConnect(self, client, **args):
         peer = client.nc.transport.getPeer()
         self.info("Client %s:%d connected", peer.host, peer.port)
-        self._component.new_client_event(peer.host, peer.port, "connected")
+        self._component.new_client_event("connected", peer.host, peer.port)
         return server.Application.onConnect(self, client)
 
     def onDisconnect(self, client):
@@ -170,7 +172,7 @@ class FMSApplication(server.Application, log.Loggable):
         server.Application.onDisconnect(self, client)
         if client == self._client:
             self._client = None
-        self._component.new_client_event(peer.host, peer.port, "disconnected")
+        self._component.new_client_event("disconnected", peer.host, peer.port)
 
     def streamPublished(self):
         self.debug("Stream %s published", self._streamName)
@@ -180,7 +182,7 @@ class FMSApplication(server.Application, log.Loggable):
         self._published = True
 
         peer = self._client.nc.transport.getPeer()
-        self._component.new_client_event(peer.host, peer.port, "published")
+        self._component.new_client_event("published", peer.host, peer.port)
 
     def streamUnpublished(self):
         self.debug("Stream %s unpublished", self._streamName)
@@ -199,7 +201,7 @@ class FMSApplication(server.Application, log.Loggable):
         self._published = False
 
         peer = self._client.nc.transport.getPeer()
-        self._component.new_client_event(peer.host, peer.port, "unpublished")
+        self._component.new_client_event("unpublished", peer.host, peer.port)
 
     def onMetaData(self, data):
         self.debug("Meta-data: %r, %s", data, type(data))
@@ -655,13 +657,11 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
 
         self.uiState.addDictKey('metadata')
         self.uiState.addDictKey('codec-info')
-
-        self.uiState.addListKey('upload-bw', [0])
-        self.uiState.addListKey('upload-fps', 0)
-        self.uiState.addListKey('encoder-host', [])
+        self.uiState.addKey('upload-bw', {"video": 0, "audio": 0})
         self.uiState.addKey('total-connections', 0)
         self.uiState.addKey('last-connect', 0)              # last client connect, epoch
-
+        self.uiState.addListKey('upload-fps', 0)
+        self.uiState.addListKey('encoder-host', [])
         self.uiState.addListKey('client-events', [])
 
     def get_pipeline_string(self, properties):
@@ -679,7 +679,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
             msg = ("Invalid mount point, it must be absolute and contains "
                    "at least two parts. For example: '/live/stream.flv'")
             self.warning(msg)
-            m = Error(T_(N_(msg)))
+            m = messages.Error(T_(N_(msg)))
             addMessage(m)
 
         self._port = int(properties.get('port', self.DEFAULT_PORT))
@@ -729,27 +729,35 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         return float(frames) / elapsed_time
 
     def _update_ui_state(self):
-        bandwidths = []
-        video_fps = 0.0
-
+        bandwidths = self.uiState.get('upload-bw', {})
         if self._sizes['video']:
             video_bps = self._calculate_bandwidth(self._sizes['video'].keys(),
                                                   self._sizes['video'].values())
-            bandwidths.append(video_bps)
+            bandwidths.update({"video": video_bps})
+
             video_fps = self._calculate_fps(self._sizes['video'].keys())
+            self.uiState.set('upload-fps', video_fps)
 
         if self._sizes['audio']:
             audio_bps = self._calculate_bandwidth(self._sizes['audio'].keys(),
                                                   self._sizes['audio'].values())
+            bandwidths.update({"audio": audio_bps})
 
-            bandwidths.append(audio_bps)
+        msg = None
+        if not sum(bandwidths.values()):
+            msg = messages.Warning(T_(N_("Client isn't pushing any data!!")))
+        elif not bandwidths.get('video', 0):
+            msg = messages.Warning(T_(N_("Client isn't pushing video!!")))
+        elif not bandwidths.get('audio', 0):
+            msg = messages.Warning(T_(N_("Client isn't pushing audio!!")))
+        else:
+            self.removeMessage("input-status")
 
-        self.log('Update bandwidth: %s bps', ", ".join(map(str, bandwidths)))
-        self.log('Buffers kept A: %d V: %d', len(self._sizes['audio']),
-                 len(self._sizes['video']))
+        if msg:
+            msg.id = "input-status"
+            self.addMessage(msg)
 
         self.uiState.set('upload-bw', bandwidths)
-        self.uiState.set('upload-fps', video_fps)
 
     def clear_sizes(self):
         self._sizes['video'] = util.OrderedDict()
@@ -769,25 +777,55 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
                 self._update_task = LoopingCall(self._update_ui_state)
                 self._update_task.start(UI_UPDATE_THROTTLE_PERIOD,  now=True)
 
-    def new_client_event(self, host, port, event):
+    def new_client_event(self, event, host, port, name=None):
+        try:
+            hostname = socket.gethostbyaddr(host)[0]
+        except:
+            hostname = ''
+
+        msg = None
+
         if event == 'connected':
             self.uiState.set('total-connections',
                              self.uiState.get('total-connections', 0) + 1)
             self.uiState.set('last-connect', time.time())
-        elif event == 'published':
-            try:
-                hostname = socket.gethostbyaddr(host)[0]
-            except:
-                hostname = ''
 
+            msg = messages.Info(T_(N_(
+                    "New client connected from %s:%s"),
+                    hostname and hostname or host, port))
+        elif event == 'published':
             self.uiState.set('encoder-host', [host, hostname, port])
+
+            msg = messages.Info(T_(N_(
+                    "Client publishing from %s:%s"),
+                    hostname and hostname or host, port))
         elif event == 'unpublished':
             self._update_task.stop()
             self._update_task = None
-            self.uiState.set('upload-bw', [0])
+            self.uiState.set('upload-bw', {"video": 0, "audio": 0})
             self.uiState.set('upload-fps', 0.0)
 
-        event = {"ip": host, "port": port,
+            msg = messages.Warning(T_(N_(
+                    "Client from %s:%s been unpublished"),
+                    hostname and hostname or host, port))
+        elif event == 'disconnect':
+            msg = messages.Warning(T_(N_(
+                    "Client from %s:%s has been disconnected"),
+                    hostname and hostname or host, port))
+        elif event == 'badname':
+            msg = messages.Warning(T_(N_(
+                    "Client from %s:%s is trying to publish to the wrong path (%s)"),
+                    hostname and hostname or host, port, name or ""))
+        elif event == 'ispublished':
+            msg = messages.Warning(T_(N_(
+                    "A new client from %s:%s is trying to publish, but we already have a publisher"),
+                    hostname and hostname or host, port))
+
+        if msg:
+            msg.id = "encoder-event"
+            self.addMessage(msg)
+
+        event = {"ip": host, "hostname" : hostname, "port": port,
                   "event": event, "timestamp": time.time()}
 
         events = self.uiState.get('client-events')
@@ -806,7 +844,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         except error.CannotListenError:
             t = 'TCP port %d is not available.' % self._port
             self.warning(t)
-            m = Error(T_(N_(
+            m = messages.Error(T_(N_(
                 "Network error: TCP port %d is not available."), self._port))
             self.addMessage(m)
             self.setMood(moods.sad)
@@ -814,7 +852,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
 
     def appError(self, msg, debug=None):
         self.warning(msg)
-        self.addMessage(Error(T_(N_(msg)), debug=debug))
+        self.addMessage(messages.Error(T_(N_(msg)), debug=debug))
 
     def setStreamCaps(self, caps):
         self._source.get_pad('src').set_caps(caps)
