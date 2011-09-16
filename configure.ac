@@ -11,6 +11,9 @@ AS_NANO
 AC_SUBST_FILE(AUTHORS)
 AUTHORS=$srcdir/AUTHORS
 
+dnl Start commit used to autogenrate ChangeLog from 'git log'
+AC_SUBST(GIT_LOG_START_COMMIT, "ae46c2ee374f07f598e72ea1bfbfe0b900cd53d8")
+
 dnl Add parameters for aclocal
 AC_SUBST(ACLOCAL_AMFLAGS, "-I m4 -I common")
 
