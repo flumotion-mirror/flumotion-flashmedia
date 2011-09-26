@@ -4,8 +4,8 @@ Release:        @PACKAGE_VERSION_RELEASE@
 Summary:        Flumotion Flash Media Streaming support.
 
 Group:          Applications/Internet
-License:        Proprietary
-URL:            http://www.fluendo.com/
+License:        LGPL
+URL:            http://www.fluendo.net/
 Source:         %{name}-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
 
