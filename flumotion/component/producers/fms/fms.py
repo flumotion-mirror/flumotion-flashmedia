@@ -1,15 +1,18 @@
 # -*- Mode: Python -*-
 # vi:si:et:sw=4:sts=4:ts=4
-#
+
 # Flumotion - a streaming media server
-# Copyright (C) 2007,2008 Fluendo, S.L. (www.fluendo.com).
+# Copyright (C) 2004,2005,2006,2007,2008,2009 Fluendo, S.L.
+# Copyright (C) 2010,2011 Flumotion Services, S.A.
 # All rights reserved.
-
-# Licensees having purchased or holding a valid Flumotion Advanced
-# Streaming Server license may use this file in accordance with the
-# Flumotion Advanced Streaming Server Commercial License Agreement.
-# See "LICENSE.Flumotion" in the source distribution for more information.
-
+#
+# This file may be distributed and/or modified under the terms of
+# the GNU Lesser General Public License version 2.1 as published by
+# the Free Software Foundation.
+# This file is distributed without any warranty; without even the implied
+# warranty of merchantability or fitness for a particular purpose.
+# See "LICENSE.LGPL" in the source distribution for more information.
+#
 # Headers in this file shall remain intact.
 
 import gst
@@ -200,8 +203,11 @@ class FMSApplication(server.Application, log.Loggable):
 
         self._published = False
 
-        peer = self._client.nc.transport.getPeer()
-        self._component.new_client_event("unpublished", peer.host, peer.port)
+        if self._client:
+            peer = self._client.nc.transport.getPeer()
+            self._component.new_client_event("unpublished", peer.host, peer.port)
+        else:
+            self._component.new_client_event("unpublished", 'unknown', 'unknown')
 
     def onMetaData(self, data):
         self.debug("Meta-data: %r, %s", data, type(data))
