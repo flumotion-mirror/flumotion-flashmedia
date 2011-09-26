@@ -1,0 +1,49 @@
+Release notes for Flumotion Flashmedia 0.10.0 "Gyoza"
+
+The Flumotion team announces
+the first release of the stable 0.10 branch
+of the Flumotion Components for RTMP input.
+
+Flumotion is a streaming media server created with the backing of
+Fluendo. It features intuitive graphical administration tools, making
+the task of setting up and manipulating audio and video streams easy for
+even novice system administrators. Flumotion is released under the LGPL.
+
+This project contains the components needed to receive video in RTMP
+from another encoding software (e.g. Adobe's Flash Media Live Encoder).
+
+
+Download
+
+You can find source releases of flumotion-dvb in the download directory:
+http://flumotion.net/src/flumotion-flashmedia/
+
+You can also find deb packages for ubuntu/debian in our ppa:
+https://launchpad.net/~flumotion-dev
+
+Flumotion Homepage
+
+More details can be found on the project's website: http://flumotion.net/
+
+Support and Bugs
+
+We use an issue tracker for bug reports and feature requests (requires login):
+https://code.flumotion.com/trac/newticket?component=flumotion-flashmedia
+
+Developers
+
+You can browse the repository of git code from our tracker.
+
+All code is in git and can be checked out from there.
+It is hosted on https://code.flumotion.com/cgit/flumotion-flashmedia/
+
+
+Contributors to this release
+
+      * Andoni Morales Alastruey
+      * Jan Urbański
+      * Josep Joan Ribas
+      * Sebastien Merle
+      * Theodoros Paschidis
+      * Thomas Vander Stichele
+      * Xavier Queralt Mateu

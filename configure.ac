@@ -1,15 +1,20 @@
-AC_INIT(flumotion-flashmedia, 0.1.0.1,
-   https://code.area51.fluendo.com/private/trac/newticket?component=flumotion-flashmedia,
-   flumotion-flashmedia)
+AC_INIT(flumotion-flashmedia, m4_esyscmd([ test -z "$VERSION" && VERSION=0.10.0;
+                              common/version-gen $VERSION .tarball-version]),
+   [flumotion-devel@lists.fluendo.com],
+   [flumotion-flashmedia], [http://www.flumotion.net/])
 
 AM_INIT_AUTOMAKE([-Wno-portability])
 
 AS_VERSION
-
+AC_SUBST(PACKAGE_VERSION_SPEC, `echo $VERSION | tr '-' '_'`)
 AS_NANO
 
 AC_SUBST_FILE(AUTHORS)
 AUTHORS=$srcdir/AUTHORS
+
+AC_SUBST(FLU_REQ, 0.10.0)
+GST_010_SUPPORTED=yes
+AC_SUBST(GST_010_SUPPORTED)
 
 dnl Start commit used to autogenrate ChangeLog from 'git log'
 AC_SUBST(GIT_LOG_START_COMMIT, "ae46c2ee374f07f598e72ea1bfbfe0b900cd53d8")
@@ -17,19 +22,18 @@ AC_SUBST(GIT_LOG_START_COMMIT, "ae46c2ee374f07f598e72ea1bfbfe0b900cd53d8")
 dnl Add parameters for aclocal
 AC_SUBST(ACLOCAL_AMFLAGS, "-I m4 -I common")
 
+dnl for rerunning libtoolize
+AC_CONFIG_MACRO_DIR([m4])
+
 dnl set up gettext
 dnl the version check needs to stay here because autopoint greps for it
-AM_GNU_GETTEXT_VERSION([0.16])
+AM_GNU_GETTEXT_VERSION([0.11.5])
 AM_GNU_GETTEXT([external])
 
 GETTEXT_PACKAGE=$PACKAGE
 AC_SUBST(GETTEXT_PACKAGE)
 
-AC_SUBST(FLU_REQ, 0.5.4)
-GST_010_SUPPORTED=yes
-AC_SUBST(GST_010_SUPPORTED)
-
-AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
+AC_PROG_INTLTOOL([0.34.2])
 
 AS_AC_EXPAND(LIBDIR, $libdir)
 AC_MSG_NOTICE(Storing library files in $LIBDIR)
@@ -112,3 +116,11 @@ flumotion/project/flashmedia.py
 flumotion-flashmedia.spec
 po/Makefile.in
 )
+
+echo
+echo "    $PACKAGE_STRING ($PACKAGE_VERSION_RELEASE)"
+echo
+echo "    pychecker:              $PYCHECKER"
+echo "    epydoc:                 $EPYDOC"
+echo
+echo "Now type \"make\" to build flumotion"
