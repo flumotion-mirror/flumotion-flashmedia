@@ -1,24 +1,23 @@
 Name:           @PACKAGE@
 Version:        @PACKAGE_VERSION_SPEC@
 Release:        @PACKAGE_VERSION_RELEASE@%{?dist}
-Summary:        Flumotion Flash Media Streaming support.
+Summary:        Flumotion Flash Media Streaming support
 
 Group:          Applications/Internet
-License:        LGPL
-URL:            http://www.fluendo.net/
+License:        LGPLv2
+URL:            http://www.flumotion.net/
 Source:         %{name}-%{version}.tar.bz2
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root
 
-Requires:	flumotion >= @FLU_REQ@
-Requires:	flvlib >= 0.1.5
-Requires:	flvlib >= 0.1.5
-Requires:	python-rtmpy
-Requires:	python-pyamf
+Requires:       flumotion >= @FLU_REQ@
+Requires:       flvlib >= 0.1.5
+Requires:       python-rtmpy
+Requires:       python-pyamf
 
-BuildRequires:	gettext
-BuildRequires:	python >= 2.3
-BuildRequires:	flumotion >= @FLU_REQ@
-BuildRequires:	epydoc
+BuildRequires:  gettext
+BuildRequires:  python >= 2.3
+BuildRequires:  flumotion >= @FLU_REQ@
+BuildRequires:  epydoc
 BuildRequires:  pkgconfig
 
 %description
