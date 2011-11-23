@@ -484,7 +484,7 @@ class FMSApplication(server.Application, log.Loggable):
     def _disconnect(self):
         if self._client is not None:
             self.debug("Disconnecting from client")
-            self._client.disconnect()
+            self.onDisconnect(self._client)
 
     def _fixeTimestamp(self, timestamp):
         """Given a timestamp finds out wether it is valid depending on the last
