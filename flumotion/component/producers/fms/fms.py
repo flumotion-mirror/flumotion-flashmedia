@@ -807,8 +807,9 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
                     "Client publishing from %s:%s"),
                     hostname and hostname or host, port))
         elif event == 'unpublished':
-            self._update_task.stop()
-            self._update_task = None
+            if self._update_task:
+                self._update_task.stop()
+                self._update_task = None
             self.uiState.set('upload-bw', {"video": 0, "audio": 0})
             self.uiState.set('upload-fps', 0.0)
 
