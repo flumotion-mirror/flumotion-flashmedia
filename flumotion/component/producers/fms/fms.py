@@ -154,7 +154,8 @@ class FMSApplication(server.Application, log.Loggable):
                 try:
                     self.unpublishStream(name, self._stream)
                 except exc.BadNameError:
-                    self.debug("Stream %s already unpublished! Going ahead with the publication")
+                    self.debug("Stream %s already unpublished! Going ahead with"
+                               " the publication", name)
 
         self.debug("And last! Your stream can be published.")
         return server.Application.publishStream(self, client, stream, name, type_)
