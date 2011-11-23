@@ -127,7 +127,7 @@ class FLVWriter(object):
             raise ValueError('timestamp cannot be < 0')
 
         if time > 0xffffffff:
-            raise OverflowError('timestamp too high %r' % (time,))
+            raise OverflowError('timestamp too high %r' % (time, ))
 
         if not self.headerWritten:
             self._writeHeader()
@@ -135,7 +135,8 @@ class FLVWriter(object):
             # PreviousTag0
             self.buffer.write_ulong(0)
             # empty audio tag -
-            self.buffer.write('\x08\x00\x00\x00\x00\x00\x00\x00\xEC\xF4\x1B\x00\x00\x00\x0B')
+            self.buffer.write('\x08\x00\x00\x00\x00\x00\x00\x00'
+                              '\xEC\xF4\x1B\x00\x00\x00\x0B')
 
         if self.firstTimestamp is None:
             self.firstTimestamp = time
@@ -187,7 +188,8 @@ class FLVWriter(object):
         self.active = False
         self.totalTime = self.previousTimestamp
         # empty audio tag -
-        self.buffer.write('\x08\x00\x00\x00\x00\x00\x00\x00\xEC\xF4\x1B\x00\x00\x00\x0B')
+        self.buffer.write('\x08\x00\x00\x00\x00\x00\x00\x00'
+                          '\xEC\xF4\x1B\x00\x00\x00\x0B')
 
     def onMetaData(self, data):
         """
@@ -203,7 +205,8 @@ class FLVWriter(object):
         else:
             self.metaData = data
 
-        b = pyamf.encode('onMetaData', self.metaData, encoding=pyamf.AMF0).getvalue()
+        b = pyamf.encode('onMetaData', self.metaData,
+                         encoding=pyamf.AMF0).getvalue()
         self._writeData(FLVWriter.META_DATA, self.previousTimestamp, b)
 
     def audioDataReceived(self, data, time):
@@ -252,8 +255,7 @@ class Client(server.Client):
         """
         self.call('onFCPublish', {
             'code': 'NetStream.Publish.Start',
-            'description': streamname
-        })
+            'description': streamname})
 
     def FCUnpublish(self, streamname):
         """
@@ -266,8 +268,7 @@ class Client(server.Client):
         """
         self.call('onFCPublish', {
             'code': 'NetStream.Unpublish.Success',
-            'description': streamname
-        })
+            'description': streamname})
 
     def releaseStream(self, streamname):
         """
@@ -305,7 +306,8 @@ class LiveStreamingApplication(server.Application):
         """
         """
         if name in self.writers:
-            raise RuntimeError('Writer already exists for stream %s' % (name,))
+            raise RuntimeError('Writer already exists'
+                               ' for stream %s' % (name, ))
 
         self.writers[name] = writer
 
@@ -313,9 +315,11 @@ class LiveStreamingApplication(server.Application):
         """
         """
         if os.path.sep in streamname:
-            raise ValueError('Cannot have %s in stream name' % (os.path.sep,))
+            raise ValueError('Cannot have %s '
+                             'in stream name' % (os.path.sep, ))
 
-        name = '%s%sflv' % (os.path.join(os.getcwd(), streamname), os.path.extsep)
+        name = '%s%sflv' % (os.path.join(os.getcwd(), streamname),
+                            os.path.extsep)
 
         handle = open(name, 'wb+')
 
@@ -348,7 +352,6 @@ if __name__ == '__main__':
     app = LiveStreamingApplication()
 
     reactor.listenTCP(4340, server.ServerFactory({
-        'live': app
-    }))
+        'live': app}))
 
     reactor.run()

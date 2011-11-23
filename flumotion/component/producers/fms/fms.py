@@ -133,8 +133,9 @@ class FMSApplication(server.Application, log.Loggable):
         if name != self._streamName:
             self.debug("Stream %s refused: stream name should be %s",
                        name, self._streamName)
-            self._component.new_client_event("badname", peer.host, peer.port, name)
-            raise exc.BadNameError('%s is not a valid name' % (name,))
+            self._component.new_client_event("badname", peer.host, peer.port,
+                                             name)
+            raise exc.BadNameError('%s is not a valid name' % (name, ))
 
         # Check if we have already a client publishing
         if self._client and client != self._client:
@@ -145,20 +146,22 @@ class FMSApplication(server.Application, log.Loggable):
                 # refuse the publish request
                 self.debug("...and it is still publishing. Sorry, but we have "
                            "to refuse this request")
-                self._component.new_client_event("ispublished", peer.host, peer.port)
-                raise exc.BadNameError('%s is already published!' % (name,))
+                self._component.new_client_event("ispublished", peer.host,
+                                                 peer.port)
+                raise exc.BadNameError('%s is already published!' % (name, ))
             else:
-                self.debug("The other client is slacking or is lost: disconnecting and "
-                           "unpublishing the old stream.")
+                self.debug("The other client is slacking or is lost: "
+                           "disconnecting and unpublishing the old stream.")
                 self.onDisconnect(self._client)
                 try:
                     self.unpublishStream(name, self._stream)
                 except exc.BadNameError:
-                    self.debug("Stream %s already unpublished! Going ahead with"
-                               " the publication", name)
+                    self.debug("Stream %s already unpublished! Going ahead "
+                               "with the publication", name)
 
         self.debug("And last! Your stream can be published.")
-        return server.Application.publishStream(self, client, stream, name, type_)
+        return server.Application.publishStream(self, client, stream,
+                                                name, type_)
 
     def unpublish(self):
         #TODO: Do wathever we need to do when the stream is unpublished
@@ -206,17 +209,19 @@ class FMSApplication(server.Application, log.Loggable):
 
         if self._client:
             peer = self._client.nc.transport.getPeer()
-            self._component.new_client_event("unpublished", peer.host, peer.port)
+            self._component.new_client_event("unpublished", peer.host,
+                                             peer.port)
         else:
-            self._component.new_client_event("unpublished", 'unknown', 'unknown')
+            self._component.new_client_event("unpublished", 'unknown',
+                                             'unknown')
 
     def onMetaData(self, data):
         self.debug("Meta-data: %r, %s", data, type(data))
         self._component.clear_sizes()
 
         if not data:
-            self.debug("We have been asked to clear metadata, we will do it as "
-                       "soon as we get new metadata")
+            self.debug("We have been asked to clear metadata, we will do "
+                       "it as soon as we get new metadata")
             return
 
         if not self._published:
@@ -266,7 +271,8 @@ class FMSApplication(server.Application, log.Loggable):
             self._firstAudioReceived = True
 
         if not self._published:
-            self._internalError('Audio frame received for an unpublished stream')
+            self._internalError('Audio frame received for an '
+                                'unpublished stream')
             return
 
         if self._started and not self._audioEnabled:
@@ -344,7 +350,8 @@ class FMSApplication(server.Application, log.Loggable):
             self._firstVideoReceived = True
 
         if not self._published:
-            self._internalError('Video frame received for an unpublished stream')
+            self._internalError('Video frame received for an '
+                                'unpublished stream')
             return
 
         if self._started and not self._videoEnabled:
@@ -357,7 +364,7 @@ class FMSApplication(server.Application, log.Loggable):
         # Set it to a dummy value just to prevent TypeError.
         tag.size = 0
         tag.parse_tag_content()
-        
+
         info = {'codec': tag.codec_id}
 
         if self._videoinfo and self._videoinfo != info:
@@ -379,8 +386,8 @@ class FMSApplication(server.Application, log.Loggable):
         self._sps_len = (ord(data[11])<<8) | ord(data[12])
         pps_pos = 14 + self._sps_len
         self._pps_len = (ord(data[pps_pos])<<8) | ord(data[pps_pos+1])
-        self.debug("Got SPS of %d bytes and PPS of %d bytes", self._sps_len, self._pps_len)
-
+        self.debug("Got SPS of %d bytes and PPS of %d bytes",
+                   self._sps_len, self._pps_len)
 
     def _removeStarCodes(self, data):
         to_remove = 0
@@ -397,7 +404,8 @@ class FMSApplication(server.Application, log.Loggable):
 
             nal_unit_type = ord(data[index+len(STARTCODE)]) & 0x0F
             if nal_unit_type == NAL_UNIT_TYPE_AUD:
-                self.debug("Found Access unit delimitier in stream. Dropping it")
+                self.debug("Found Access unit delimitier in stream. "
+                           "Dropping it")
                 to_remove += 2
                 start += len(STARTCODE) + 2
             if nal_unit_type == NAL_UNIT_TYPE_SPS:
@@ -415,7 +423,8 @@ class FMSApplication(server.Application, log.Loggable):
 
         if to_remove:
             to_remove += 3
-            dataio = StringIO(data[:remove_from] + data[remove_from+to_remove:])
+            dataio = StringIO(data[:remove_from] +
+                              data[remove_from+to_remove:])
             total_bytes = (ord(data[7])<<8) | ord(data[8])
             total_bytes -= to_remove
             dataio.seek(7)
@@ -429,7 +438,7 @@ class FMSApplication(server.Application, log.Loggable):
             # the timestamp of this buffer is not continious and is sent
             # after the reconnection with a weird timestamp. use the last
             # timestamp for it.
-      	    fixedTime = self._fixeTimestamp(self._totalTime)
+            fixedTime = self._fixeTimestamp(self._totalTime)
         else:
             fixedTime = self._fixeTimestamp(time)
 
@@ -586,7 +595,7 @@ class FMSApplication(server.Application, log.Loggable):
         buffer = self._buildHeaderBuffer(header)
 
         caps = gst.caps_from_string("video/x-flv")
-        caps[0]['streamheader'] = (buffer,) + tuple(self._headers)
+        caps[0]['streamheader'] = (buffer, ) + tuple(self._headers)
         self._component.setStreamCaps(caps)
 
         if self._backlog:
@@ -666,7 +675,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
         self.uiState.addDictKey('codec-info')
         self.uiState.addKey('upload-bw', {"video": 0, "audio": 0})
         self.uiState.addKey('total-connections', 0)
-        self.uiState.addKey('last-connect', 0)              # last client connect, epoch
+        self.uiState.addKey('last-connect', 0)  # last client connect, epoch
         self.uiState.addListKey('upload-fps', 0)
         self.uiState.addListKey('encoder-host', [])
         self.uiState.addListKey('client-events', [])
@@ -738,16 +747,16 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
     def _update_ui_state(self):
         bandwidths = self.uiState.get('upload-bw', {})
         if self._sizes['video']:
-            video_bps = self._calculate_bandwidth(self._sizes['video'].keys(),
-                                                  self._sizes['video'].values())
+            video_bps = self._calculate_bandwidth(
+                self._sizes['video'].keys(), self._sizes['video'].values())
             bandwidths.update({"video": video_bps})
 
             video_fps = self._calculate_fps(self._sizes['video'].keys())
             self.uiState.set('upload-fps', video_fps)
 
         if self._sizes['audio']:
-            audio_bps = self._calculate_bandwidth(self._sizes['audio'].keys(),
-                                                  self._sizes['audio'].values())
+            audio_bps = self._calculate_bandwidth(
+                self._sizes['audio'].keys(), self._sizes['audio'].values())
             bandwidths.update({"audio": audio_bps})
 
         msg = None
@@ -782,7 +791,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
             del sizes[times[0]]
             if not self._update_task:
                 self._update_task = LoopingCall(self._update_ui_state)
-                self._update_task.start(UI_UPDATE_THROTTLE_PERIOD,  now=True)
+                self._update_task.start(UI_UPDATE_THROTTLE_PERIOD, now=True)
 
     def new_client_event(self, event, host, port, name=None):
         try:
@@ -822,18 +831,20 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
                     hostname and hostname or host, port))
         elif event == 'badname':
             msg = messages.Warning(T_(N_(
-                    "Client from %s:%s is trying to publish to the wrong path (%s)"),
-                    hostname and hostname or host, port, name or ""))
+                "Client from %s:%s is trying to publish "
+                "to the wrong path (%s)"),
+                hostname and hostname or host, port, name or ""))
         elif event == 'ispublished':
             msg = messages.Warning(T_(N_(
-                    "A new client from %s:%s is trying to publish, but we already have a publisher"),
+                    "A new client from %s:%s is trying to publish, "
+                    "but we already have a publisher"),
                     hostname and hostname or host, port))
 
         if msg:
             msg.id = "encoder-event"
             self.addMessage(msg)
 
-        event = {"ip": host, "hostname" : hostname, "port": port,
+        event = {"ip": host, "hostname": hostname, "port": port,
                   "event": event, "timestamp": time.time()}
 
         events = self.uiState.get('client-events')

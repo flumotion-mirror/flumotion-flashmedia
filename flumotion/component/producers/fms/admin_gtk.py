@@ -44,7 +44,8 @@ class MediaAdminGtkNode(BaseAdminGtkNode):
         self._label_video_device = self.wtree.get_widget('video_device')
         self._label_video_codec = self.wtree.get_widget('video_codec')
         self._label_video_framerate = self.wtree.get_widget('video_framerate')
-        self._label_video_keyframe = self.wtree.get_widget('video_keyframe_dist')
+        self._label_video_keyframe = \
+                self.wtree.get_widget('video_keyframe_dist')
         self._label_video_br = self.wtree.get_widget('video_bitrate')
         self._label_video_size = self.wtree.get_widget('video_size')
 
@@ -66,7 +67,7 @@ class MediaAdminGtkNode(BaseAdminGtkNode):
 
         self.haveMetadata(state.get('metadata', {}))
         self.haveCodecInfo(state.get('codec-info', {}))
-    
+
     def stateSet(self, state, key, value):
         if key == "codec-info":
             self.haveCodecInfo(value)
@@ -102,8 +103,9 @@ class MediaAdminGtkNode(BaseAdminGtkNode):
 
         bitrate = metadata.get('videodatarate', 0)
         if bitrate:
-            self._label_video_br.set_text(formatStorage(bitrate*1000) + _("bit/s"))
-        
+            self._label_video_br.set_text(
+                formatStorage(bitrate*1000) + _("bit/s"))
+
         keyframe_dist = metadata.get('videokeyframe_frequency', 0)
         if keyframe_dist:
             self._label_video_keyframe.set_text("%d s" % keyframe_dist)
@@ -133,14 +135,12 @@ class MediaAdminGtkNode(BaseAdminGtkNode):
             self.stateSetitem(self.state, 'codec-info', subkey,
                               codec_info[subkey])
 
-
     def _clean_codec_labels(self):
         self._label_video_codec.set_text('Unknown')
         self._label_audio_codec.set_text('Unknown')
         self._label_audio_rate.set_text('Unknown')
         self._label_audio_channels.set_text('Unknown')
         self._label_audio_depth.set_text('Unknown')
-
 
     def _clean_metadata_labels(self):
         # Video
@@ -194,8 +194,8 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
             ]:
             self.getWidget(name)
 
-        self.widgets['label-encoder-mountpoint'].set_text(properties.get('mount-point',
-                                                                         '/live/stream.flv'))
+        self.widgets['label-encoder-mountpoint'].set_text(
+            properties.get('mount-point', '/live/stream.flv'))
 
         def format_time(timestamp):
             return time.strftime("%x %X", time.localtime(timestamp))
@@ -210,7 +210,7 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
 
         self.widget.show_all()
         return self.widget
-    
+
     def setUIState(self, state):
         BaseAdminGtkNode.setUIState(self, state)
         if not self.widget:
@@ -218,12 +218,12 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
 
         if not self.uiStateHandlers:
             self.uiStateHandlers = {
-                'upload-bw':         self.uploadBandwidthSet,
-                'upload-fps':        self.uploadFPSSet,
+                'upload-bw': self.uploadBandwidthSet,
+                'upload-fps': self.uploadFPSSet,
                 'total-connections': self.totalConnectionsSet,
-                'encoder-host':      self.encoderHostSet,
-                'last-connect':      self.lastConnectSet,
-                'client-events':    self.clientEventsSet,
+                'encoder-host': self.encoderHostSet,
+                'last-connect': self.lastConnectSet,
+                'client-events': self.clientEventsSet,
             }
 
         for k, handler in self.uiStateHandlers.items():
@@ -254,7 +254,8 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
         total = video_bw + audio_bw
 
         if not video_bw or not audio_bw:
-            self.widgets['label-bandwidth'].set_text(formatStorage(total) + _("bit/s"))
+            self.widgets['label-bandwidth'].set_text(
+                formatStorage(total) + _("bit/s"))
         else:
             self.widgets['label-bandwidth'].set_text(
                 "Video, %s\nAudio, %s\nTotal,  %s" %(
@@ -267,7 +268,8 @@ class ConnectionsAdminGtkNode(BaseAdminGtkNode):
 
     def encoderHostSet(self, host):
         if len(host) == 3:
-            hostname_str = host[1] != '' and "%s (%s)" % (host[1], host[0]) or host[0]
+            hostname_str = host[1] != '' and \
+                    "%s (%s)" % (host[1], host[0]) or host[0]
             self.widgets['label-encoder-ip'].set_text(hostname_str)
             self.widgets['label-encoder-port'].set_text("%s" % host[2])
 
@@ -304,8 +306,10 @@ class MetadataAdminGtkNode(BaseAdminGtkNode):
         self.metadata = self.wtree.get_widget('metadata')
         import pango
         self.metadata.set_columns(
-            [Column("key", title=_("Key"), searchable=True, expand=False),
-             Column("value", title=_("Value"), ellipsize=pango.ELLIPSIZE_END, expand=True),
+            [Column("key", title=_("Key"),
+                    searchable=True, expand=False),
+             Column("value", title=_("Value"),
+                    ellipsize=pango.ELLIPSIZE_END, expand=True),
             ])
         self.widget.show_all()
         return self.widget
@@ -315,7 +319,7 @@ class MetadataAdminGtkNode(BaseAdminGtkNode):
         if not self.widget:
             return
         self.setMetadata(state.get('metadata'))
-    
+
     def stateSet(self, state, key, value):
         if key != "metadata":
             return
@@ -327,13 +331,14 @@ class MetadataAdminGtkNode(BaseAdminGtkNode):
             self.metadata.append(
                 Settable(key=name, value=metadata[name]))
 
+
 class FMSAdminGtk(BaseAdminGtk):
 
     def setup(self):
         self.nodes['Media'] = MediaAdminGtkNode(self.state, self.admin,
                                                 _("Media Info"))
-        self.nodes['Connections'] = ConnectionsAdminGtkNode(self.state, self.admin,
-                                                            _("Connections"))
+        self.nodes['Connections'] = ConnectionsAdminGtkNode(self.state,
+                                               self.admin, _("Connections"))
         self.nodes['Metadata'] = MetadataAdminGtkNode(self.state, self.admin,
                                                       _("Metadata"))
         return BaseAdminGtk.setup(self)
