@@ -762,25 +762,21 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
 
         msg = None
         if not sum(bandwidths.values()):
-            if self._posted_message == 'data':
-                break
-            self._posted_message= 'data'
-            msg = messages.Warning(T_(N_("Client isn't pushing any data!!")))
+            if self._posted_message != 'data':
+                self._posted_message= 'data'
+                msg = messages.Warning(T_(N_("Client isn't pushing data!!")))
         elif not bandwidths.get('video', 0):
-            if self._posted_message == 'video':
-                break
-            self._posted_message = 'video'
-            msg = messages.Warning(T_(N_("Client isn't pushing video!!")))
+            if self._posted_message != 'video':
+                self._posted_message = 'video'
+                msg = messages.Warning(T_(N_("Client isn't pushing video!!")))
         elif not bandwidths.get('audio', 0):
-            if self._posted_message == 'audio':
-                break
-            self._posted_message = 'audio'
-            msg = messages.Warning(T_(N_("Client isn't pushing audio!!")))
+            if self._posted_message != 'audio':
+                self._posted_message = 'audio'
+                msg = messages.Warning(T_(N_("Client isn't pushing audio!!")))
         else:
-            if not self._posted_message:
-                break
-            self._posted_message = ''
-            self.removeMessage("input-status")
+            if self._posted_message:
+                self._posted_message = ''
+                self.removeMessage("input-status")
 
         if msg:
             msg.id = "input-status"
