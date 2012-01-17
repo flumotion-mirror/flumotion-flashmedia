@@ -670,6 +670,7 @@ class FlashMediaServer(feedcomponent.ParseLaunchComponent):
                        'video': util.OrderedDict()}
 
         self._update_task = None
+        self._posted_message = None
 
         self.uiState.addDictKey('metadata')
         self.uiState.addDictKey('codec-info')
