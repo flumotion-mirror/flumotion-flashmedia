@@ -110,8 +110,15 @@ class MediaAdminGtkNode(BaseAdminGtkNode):
         if keyframe_dist:
             self._label_video_keyframe.set_text("%d s" % keyframe_dist)
 
-        width = metadata.get('width', 0)
-        height = metadata.get('height', 0)
+        try:
+            width = int(metadata.get('width', 0))
+        except ValueError:
+            width = 0
+        try:
+            height = int(metadata.get('height', 0))
+        except ValueError:
+            height = 0
+
         if width:
             if height:
                 self._label_video_size.set_text("%d x %d" % (width, height))
